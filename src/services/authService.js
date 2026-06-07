@@ -10,6 +10,12 @@ function saveAuth(data) {
     // ignore storage errors
   }
 }
+function clearAuth() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+  localStorage.removeItem("role");
+}
 
 export async function login({ email, password }) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -35,10 +41,15 @@ export async function login({ email, password }) {
   return data;
 }
 
-export function logout() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
-  localStorage.removeItem("role");
+export async function logout() {
+  try {
+    await authFetch(`${API_BASE_URL}/auth/logout`, {
+      method: "POST",
+    });
+  } catch (e) {
+    // even if call fails, still clear local storage
+  }
+  clearAuth();
 }
 
 export function getToken() {
@@ -65,5 +76,16 @@ export async function authFetch(input, init = {}) {
   const token = getToken();
   const headers = new Headers(init.headers || {});
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(input, { ...init, headers });
+  headers.set("Content-Type", "application/json");
+
+  const response = await fetch(input, { ...init, headers });
+
+  // token expired → force re-login
+  if (response.status === 401) {
+    clearAuth();
+    window.location.href = "/login";
+    return;
+  }
+
+  return response;
 }
