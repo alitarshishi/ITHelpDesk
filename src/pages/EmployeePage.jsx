@@ -1,7 +1,8 @@
-// EmployeePage.jsx
+import ActivityLogModal from "../components/ActivityLogModal";
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authFetch, logout, getUser } from "../services/authService";
+import TicketDetailModal from "../components/TicketDetailModal";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
@@ -80,7 +81,7 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
     priority: "Medium",
     managerId: "",
   });
-  const [attachments, setAttachments] = useState([]); // list of file names
+  const [attachments, setAttachments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef();
@@ -90,9 +91,8 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    const names = files.map((f) => f.name);
-    setAttachments((prev) => [...prev, ...names]);
-    e.target.value = ""; // reset so same file can be added again
+    setAttachments((prev) => [...prev, ...files.map((f) => f.name)]);
+    e.target.value = "";
   };
 
   const removeAttachment = (index) =>
@@ -107,19 +107,14 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
       setError("Description is required.");
       return;
     }
-
     setLoading(true);
     setError("");
-
     try {
-      // 1. look up category, priority, and status IDs from backend
-      const [catRes, priRes, statRes, managerRes] = await Promise.all([
+      const [catRes, priRes, statRes] = await Promise.all([
         authFetch(`${API_BASE_URL}/lookup/categories`),
         authFetch(`${API_BASE_URL}/lookup/priorities`),
         authFetch(`${API_BASE_URL}/lookup/statuses`),
-        Promise.resolve(null), // managers already fetched
       ]);
-
       const categories = await catRes.json();
       const priorities = await priRes.json();
       const statuses = await statRes.json();
@@ -135,27 +130,23 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
       )?.id;
 
       if (!categoryId || !priorityId || !statusId) {
-        setError(
-          "Could not resolve category, priority, or status. Check your database seed.",
-        );
+        setError("Could not resolve category, priority, or status.");
         setLoading(false);
         return;
       }
 
-      const body = {
-        title: form.title,
-        description: form.description,
-        categoryId,
-        priorityId,
-        statusId,
-        submittedById: currentUser?.id,
-        assignedToId: form.managerId ? parseInt(form.managerId) : null,
-        attachmentNames: attachments,
-      };
-
       const res = await authFetch(`${API_BASE_URL}/tickets`, {
         method: "POST",
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          categoryId,
+          priorityId,
+          statusId,
+          submittedById: currentUser?.id,
+          assignedToId: form.managerId ? parseInt(form.managerId) : null,
+          attachmentNames: attachments,
+        }),
       });
 
       if (!res.ok) {
@@ -163,7 +154,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
         setError(d?.message || "Failed to create ticket.");
         return;
       }
-
       onCreated();
       onClose();
     } catch {
@@ -209,7 +199,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h5 className="mb-0 fw-bold" style={{ fontSize: "1.25rem" }}>
             Create New Ticket
@@ -237,7 +226,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
           </div>
         )}
 
-        {/* Title */}
         <div className="mb-3">
           <label
             className="form-label fw-semibold"
@@ -255,7 +243,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
           />
         </div>
 
-        {/* Description */}
         <div className="mb-3">
           <label
             className="form-label fw-semibold"
@@ -273,7 +260,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
           />
         </div>
 
-        {/* Category + Priority */}
         <div className="d-flex gap-3 mb-3">
           <div style={{ flex: 1 }}>
             <label
@@ -313,7 +299,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
           </div>
         </div>
 
-        {/* Assign to Manager */}
         <div className="mb-3">
           <label
             className="form-label fw-semibold"
@@ -339,7 +324,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
           </select>
         </div>
 
-        {/* Attachments */}
         <div className="mb-4">
           <label
             className="form-label fw-semibold"
@@ -347,35 +331,31 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
           >
             Attachments
           </label>
-          <div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current.click()}
-              style={{
-                background: "#f3f4f6",
-                border: "1px dashed #d1d5db",
-                borderRadius: "10px",
-                padding: "9px 18px",
-                cursor: "pointer",
-                fontSize: "0.85rem",
-                color: "#374151",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              📎 Add Attachment
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              style={{ display: "none" }}
-              onChange={handleFileChange}
-            />
-          </div>
-
-          {/* File list */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current.click()}
+            style={{
+              background: "#f3f4f6",
+              border: "1px dashed #d1d5db",
+              borderRadius: "10px",
+              padding: "9px 18px",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              color: "#374151",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            📎 Add Attachment
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
           {attachments.length > 0 && (
             <div
               style={{
@@ -408,7 +388,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
                       color: "#9ca3af",
                       cursor: "pointer",
                       fontSize: "1rem",
-                      lineHeight: 1,
                     }}
                   >
                     ×
@@ -419,7 +398,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
           )}
         </div>
 
-        {/* Buttons */}
         <div className="d-flex justify-content-end gap-2">
           <button
             onClick={onClose}
@@ -430,7 +408,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
               padding: "8px 22px",
               cursor: "pointer",
               fontWeight: 500,
-              fontSize: "0.9rem",
             }}
           >
             Cancel
@@ -446,7 +423,6 @@ function CreateTicketModal({ onClose, onCreated, managers }) {
               padding: "8px 22px",
               cursor: "pointer",
               fontWeight: 600,
-              fontSize: "0.9rem",
             }}
           >
             {loading ? "Creating..." : "Create Ticket"}
@@ -468,8 +444,9 @@ export default function EmployeePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [activityModal, setActivityModal] = useState(null); // 👈 added
 
-  // ── Fetch my tickets ──────────────────────────────────
   const fetchMyTickets = async () => {
     setLoading(true);
     setError("");
@@ -485,16 +462,13 @@ export default function EmployeePage() {
     }
   };
 
-  // ── Fetch managers (role = Manager) ──────────────────
   const fetchManagers = async () => {
     try {
       const res = await authFetch(`${API_BASE_URL}/users/managers`);
       if (!res.ok) return;
       const data = await res.json();
       setManagers(data);
-    } catch {
-      // non-critical — manager dropdown just stays empty
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -502,11 +476,10 @@ export default function EmployeePage() {
     fetchManagers();
   }, []);
 
-  // ── Delete ticket (only if Open) ──────────────────────
   const handleDelete = async (ticket) => {
     if ((ticket.statusName || "").toLowerCase() !== "open") {
       setDeleteError(
-        `Ticket TKT-${String(ticket.id).padStart(4, "0")} cannot be deleted — status is "${ticket.statusName}".`,
+        `TKT-${String(ticket.id).padStart(4, "0")} cannot be deleted — status is "${ticket.statusName}".`,
       );
       setTimeout(() => setDeleteError(""), 4000);
       return;
@@ -517,7 +490,6 @@ export default function EmployeePage() {
       )
     )
       return;
-
     try {
       const res = await authFetch(`${API_BASE_URL}/tickets/${ticket.id}`, {
         method: "DELETE",
@@ -546,7 +518,6 @@ export default function EmployeePage() {
     borderBottom: "1px solid #e5e7eb",
     whiteSpace: "nowrap",
   };
-
   const tdStyle = {
     padding: "13px 16px",
     fontSize: "0.85rem",
@@ -610,7 +581,6 @@ export default function EmployeePage() {
             </div>
           </div>
         </div>
-
         <div style={{ display: "flex", gap: "10px" }}>
           <button
             onClick={() => setShowModal(true)}
@@ -646,7 +616,6 @@ export default function EmployeePage() {
 
       {/* ── Content ── */}
       <div style={{ padding: "32px" }}>
-        {/* Page title */}
         <div style={{ marginBottom: "24px" }}>
           <h4 style={{ margin: 0, fontWeight: 700, fontSize: "1.3rem" }}>
             My Tickets
@@ -656,7 +625,6 @@ export default function EmployeePage() {
           </p>
         </div>
 
-        {/* Delete error toast */}
         {deleteError && (
           <div
             className="alert alert-warning py-2 mb-3"
@@ -688,6 +656,7 @@ export default function EmployeePage() {
                       "Status",
                       "Priority",
                       "Category",
+                      "Assigned by",
                       "Assigned To",
                       "Created",
                       "",
@@ -702,7 +671,7 @@ export default function EmployeePage() {
                   {tickets.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         style={{
                           ...tdStyle,
                           textAlign: "center",
@@ -749,6 +718,10 @@ export default function EmployeePage() {
                         <td style={tdStyle}>{priorityBadge(t.priorityName)}</td>
                         <td style={tdStyle}>{t.categoryName || "—"}</td>
                         <td style={tdStyle}>
+                          {t.assignedByManagerName || "—"}
+                        </td>
+
+                        <td style={tdStyle}>
                           {t.assignedToName || (
                             <span style={{ color: "#9ca3af" }}>Unassigned</span>
                           )}
@@ -758,36 +731,78 @@ export default function EmployeePage() {
                             ? new Date(t.dateCreated).toLocaleDateString()
                             : "—"}
                         </td>
+
+                        {/* 👇 action buttons */}
                         <td style={tdStyle}>
-                          <button
-                            onClick={() => handleDelete(t)}
-                            title={
-                              (t.statusName || "").toLowerCase() !== "open"
-                                ? "Can only delete Open tickets"
-                                : "Delete ticket"
-                            }
+                          <div
                             style={{
-                              background: "none",
-                              border: "1px solid",
-                              borderColor:
-                                (t.statusName || "").toLowerCase() === "open"
-                                  ? "#fca5a5"
-                                  : "#e5e7eb",
-                              color:
-                                (t.statusName || "").toLowerCase() === "open"
-                                  ? "#ef4444"
-                                  : "#d1d5db",
-                              borderRadius: "6px",
-                              padding: "4px 10px",
-                              fontSize: "0.78rem",
-                              cursor:
-                                (t.statusName || "").toLowerCase() === "open"
-                                  ? "pointer"
-                                  : "not-allowed",
+                              display: "flex",
+                              gap: "6px",
+                              flexWrap: "wrap",
                             }}
                           >
-                            Delete
-                          </button>
+                            <button
+                              onClick={() => setSelected(t)}
+                              style={{
+                                background: "#f3f4f6",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "4px 10px",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Details
+                            </button>
+                            <button
+                              onClick={() => setActivityModal(t)}
+                              style={{
+                                background: "#eff6ff",
+                                color: "#1d4ed8",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "4px 10px",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Activity
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(t);
+                              }}
+                              title={
+                                (t.statusName || "").toLowerCase() !== "open"
+                                  ? "Can only delete Open tickets"
+                                  : "Delete ticket"
+                              }
+                              style={{
+                                background: "none",
+                                border: "1px solid",
+                                borderColor:
+                                  (t.statusName || "").toLowerCase() === "open"
+                                    ? "#fca5a5"
+                                    : "#e5e7eb",
+                                color:
+                                  (t.statusName || "").toLowerCase() === "open"
+                                    ? "#ef4444"
+                                    : "#d1d5db",
+                                borderRadius: "6px",
+                                padding: "4px 10px",
+                                fontSize: "0.75rem",
+                                cursor:
+                                  (t.statusName || "").toLowerCase() === "open"
+                                    ? "pointer"
+                                    : "not-allowed",
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -799,12 +814,33 @@ export default function EmployeePage() {
         )}
       </div>
 
-      {/* ── Modal ── */}
+      {/* ── Create Ticket Modal ── */}
       {showModal && (
         <CreateTicketModal
           managers={managers}
           onClose={() => setShowModal(false)}
           onCreated={fetchMyTickets}
+        />
+      )}
+
+      {/* ── Ticket Details Modal ── */}
+      {selected && (
+        <TicketDetailModal
+          ticket={selected}
+          onClose={() => setSelected(null)}
+          onUpdated={fetchMyTickets}
+          canManage={false}
+          canResolve={false}
+          canComment={true}
+          canAttach={true}
+        />
+      )}
+
+      {/* ── Activity Log Modal ── */}
+      {activityModal && (
+        <ActivityLogModal
+          ticket={activityModal}
+          onClose={() => setActivityModal(null)}
         />
       )}
     </div>

@@ -1,7 +1,8 @@
-// ManagerPage.jsx
+import ActivityLogModal from "../components/ActivityLogModal";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authFetch, logout, getUser } from "../services/authService";
+import TicketDetailModal from "../components/TicketDetailModal";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
@@ -74,364 +75,6 @@ const priorityBadge = (p) => {
   );
 };
 
-const STATUS_OPTIONS = ["Open", "In Progress", "Resolved", "Closed"];
-
-// ── Ticket Detail Modal ───────────────────────────────────
-function TicketDetailModal({ ticket, itAgents, onClose, onUpdated }) {
-  const [assignId, setAssignId] = useState(ticket.assignedToId ?? "");
-  const [status, setStatus] = useState(ticket.statusName ?? "Open");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [activeAction, setActiveAction] = useState(null); // "status" | "reassign" | null
-
-  const handleUpdate = async () => {
-    setSaving(true);
-    setError("");
-    try {
-      // find status ID
-      const statRes = await authFetch(`${API_BASE_URL}/lookup/statuses`);
-      const statuses = await statRes.json();
-      const statusId = statuses.find(
-        (s) => s.name.toLowerCase() === status.toLowerCase(),
-      )?.id;
-
-      if (!statusId) {
-        setError("Could not resolve status.");
-        setSaving(false);
-        return;
-      }
-
-      const res = await authFetch(
-        `${API_BASE_URL}/manager/${ticket.id}/update`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            statusId,
-            assignedToId: assignId ? parseInt(assignId) : null,
-            priorityId: null,
-          }),
-        },
-      );
-
-      if (!res.ok) {
-        setError("Failed to update ticket.");
-        return;
-      }
-      onUpdated();
-      onClose();
-    } catch {
-      setError("Could not reach the server.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const infoRow = (icon, label, value) => (
-    <div style={{ flex: "1 1 45%", minWidth: "180px" }}>
-      <div
-        style={{
-          fontSize: "0.75rem",
-          color: "#9ca3af",
-          marginBottom: "4px",
-          display: "flex",
-          alignItems: "center",
-          gap: "5px",
-        }}
-      >
-        <span>{icon}</span>
-        {label}
-      </div>
-      <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#111" }}>
-        {value || "—"}
-      </div>
-    </div>
-  );
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1050,
-        padding: "24px",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: "16px",
-          width: "100%",
-          maxWidth: "600px",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-          maxHeight: "90vh",
-          overflowY: "auto",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ── Header ── */}
-        <div style={{ padding: "28px 28px 0" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "12px",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "0.85rem",
-                  color: "#6b7280",
-                  fontWeight: 600,
-                }}
-              >
-                #TKT-{String(ticket.id).padStart(4, "0")}
-              </span>
-              {priorityBadge(ticket.priorityName)}
-              {statusBadge(ticket.statusName)}
-            </div>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "1.4rem",
-                cursor: "pointer",
-                color: "#9ca3af",
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-          </div>
-          <h5
-            style={{
-              margin: "0 0 20px",
-              fontWeight: 700,
-              fontSize: "1.2rem",
-              lineHeight: 1.3,
-            }}
-          >
-            {ticket.title}
-          </h5>
-          <hr style={{ margin: "0 0 20px", borderColor: "#f3f4f6" }} />
-        </div>
-
-        {/* ── Info grid ── */}
-        <div style={{ padding: "0 28px 20px" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
-            {infoRow("👤", "Created by", ticket.submittedByName)}
-            {infoRow(
-              "👤",
-              "Assigned to",
-              ticket.assignedToName || "Unassigned",
-            )}
-            {infoRow("🏷️", "Category", ticket.categoryName)}
-            {infoRow(
-              "📅",
-              "Created",
-              ticket.dateCreated
-                ? new Date(ticket.dateCreated).toLocaleString()
-                : "—",
-            )}
-          </div>
-        </div>
-
-        <hr style={{ margin: "0 28px 20px", borderColor: "#f3f4f6" }} />
-
-        {/* ── Activity (empty for now) ── */}
-        <div style={{ padding: "0 28px 20px" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "16px",
-            }}
-          >
-            <span>💬</span>
-            <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>
-              Activity
-            </span>
-          </div>
-          <p style={{ color: "#9ca3af", fontSize: "0.85rem", margin: 0 }}>
-            No activity yet.
-          </p>
-        </div>
-
-        <hr style={{ margin: "0 28px 20px", borderColor: "#f3f4f6" }} />
-
-        {/* ── Action panels ── */}
-        <div style={{ padding: "0 28px 28px" }}>
-          {error && (
-            <div
-              className="alert alert-danger py-2 mb-3"
-              style={{ fontSize: "0.85rem" }}
-            >
-              {error}
-            </div>
-          )}
-
-          {/* ── Update Status panel ── */}
-          {activeAction === "status" && (
-            <div
-              style={{
-                background: "#f9fafb",
-                borderRadius: "10px",
-                padding: "16px",
-                marginBottom: "12px",
-              }}
-            >
-              <label
-                style={{
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  display: "block",
-                  marginBottom: "8px",
-                }}
-              >
-                Update Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid #e5e7eb",
-                  fontSize: "0.9rem",
-                  background: "#fff",
-                  outline: "none",
-                }}
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* ── Reassign panel ── */}
-          {activeAction === "reassign" && (
-            <div
-              style={{
-                background: "#f9fafb",
-                borderRadius: "10px",
-                padding: "16px",
-                marginBottom: "12px",
-              }}
-            >
-              <label
-                style={{
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  display: "block",
-                  marginBottom: "8px",
-                }}
-              >
-                Assign to IT Agent
-              </label>
-              <select
-                value={assignId}
-                onChange={(e) => setAssignId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid #e5e7eb",
-                  fontSize: "0.9rem",
-                  background: "#fff",
-                  outline: "none",
-                }}
-              >
-                <option value="">— Unassigned —</option>
-                {itAgents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.userName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* ── Action buttons ── */}
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button
-              onClick={() =>
-                setActiveAction(activeAction === "status" ? null : "status")
-              }
-              style={{
-                background: activeAction === "status" ? "#111" : "#fff",
-                color: activeAction === "status" ? "#fff" : "#111",
-                border: "1px solid #111",
-                borderRadius: "8px",
-                padding: "8px 18px",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-                cursor: "pointer",
-              }}
-            >
-              Update Status
-            </button>
-
-            <button
-              onClick={() =>
-                setActiveAction(activeAction === "reassign" ? null : "reassign")
-              }
-              style={{
-                background: activeAction === "reassign" ? "#111" : "#fff",
-                color: activeAction === "reassign" ? "#fff" : "#111",
-                border: "1px solid #d1d5db",
-                borderRadius: "8px",
-                padding: "8px 18px",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-                cursor: "pointer",
-              }}
-            >
-              Reassign
-            </button>
-
-            {activeAction && (
-              <button
-                onClick={handleUpdate}
-                disabled={saving}
-                style={{
-                  background: "#16a34a",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "8px",
-                  padding: "8px 18px",
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                  marginLeft: "auto",
-                }}
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main ManagerPage ──────────────────────────────────────
 export default function ManagerPage() {
   const navigate = useNavigate();
@@ -441,18 +84,17 @@ export default function ManagerPage() {
   const [itAgents, setItAgents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState(null); // ticket for detail modal
+  const [selected, setSelected] = useState(null);
+  const [activityModal, setActivityModal] = useState(null); // 👈 added
   const [filterStatus, setFilterStatus] = useState("All");
   const [search, setSearch] = useState("");
   const [filterPrio, setFilterPrio] = useState("All Priorities");
   const [filterCat, setFilterCat] = useState("All Categories");
 
-  // ── Fetch assigned tickets ────────────────────────────
   const fetchTickets = async () => {
     setLoading(true);
     setError("");
     try {
-      const myId = currentUser?.id;
       const res = await authFetch(`${API_BASE_URL}/manager/team-tickets`);
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -464,7 +106,6 @@ export default function ManagerPage() {
     }
   };
 
-  // ── Fetch IT Agents ───────────────────────────────────
   const fetchItAgents = async () => {
     try {
       const res = await authFetch(`${API_BASE_URL}/users/itagents`);
@@ -484,7 +125,6 @@ export default function ManagerPage() {
     navigate("/login");
   };
 
-  // ── Stats ─────────────────────────────────────────────
   const total = tickets.length;
   const openCount = tickets.filter(
     (t) => (t.statusName || "").toLowerCase() === "open",
@@ -496,7 +136,6 @@ export default function ManagerPage() {
     (t) => (t.statusName || "").toLowerCase() === "resolved",
   ).length;
 
-  // ── Filtered tickets ──────────────────────────────────
   const filtered = tickets.filter((t) => {
     const matchStatus =
       filterStatus === "All" ||
@@ -517,7 +156,6 @@ export default function ManagerPage() {
     ...new Set(tickets.map((t) => t.categoryName).filter(Boolean)),
   ];
 
-  // ── Styles ────────────────────────────────────────────
   const thStyle = {
     padding: "12px 16px",
     fontSize: "0.75rem",
@@ -668,7 +306,6 @@ export default function ManagerPage() {
             overflow: "hidden",
           }}
         >
-          {/* Section header */}
           <div style={{ padding: "20px 24px 0" }}>
             <div
               style={{
@@ -686,7 +323,7 @@ export default function ManagerPage() {
               </span>
             </div>
 
-            {/* Status filter tabs */}
+            {/* Status tabs */}
             <div
               style={{
                 display: "flex",
@@ -720,7 +357,7 @@ export default function ManagerPage() {
               ))}
             </div>
 
-            {/* Search + filters row */}
+            {/* Search + filters */}
             <div
               style={{
                 display: "flex",
@@ -795,7 +432,6 @@ export default function ManagerPage() {
             </div>
           </div>
 
-          {/* Table */}
           {loading && (
             <p style={{ padding: "24px", color: "#6b7280" }}>
               Loading tickets...
@@ -808,14 +444,17 @@ export default function ManagerPage() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
+                    {/* 👇 added empty column for action buttons */}
                     {[
                       "Ticket ID",
                       "Title",
                       "Status",
                       "Priority",
                       "Category",
+                      "Created By",
                       "Assigned To",
                       "Created",
+                      "",
                     ].map((h) => (
                       <th key={h} style={thStyle}>
                         {h}
@@ -827,7 +466,7 @@ export default function ManagerPage() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={9}
                         style={{
                           ...tdStyle,
                           textAlign: "center",
@@ -842,11 +481,6 @@ export default function ManagerPage() {
                     filtered.map((t) => (
                       <tr
                         key={t.id}
-                        onClick={() => setSelected(t)}
-                        style={{
-                          cursor: "pointer",
-                          transition: "background 0.1s",
-                        }}
                         onMouseEnter={(e) =>
                           (e.currentTarget.style.background = "#f9fafb")
                         }
@@ -877,6 +511,7 @@ export default function ManagerPage() {
                         <td style={tdStyle}>{statusBadge(t.statusName)}</td>
                         <td style={tdStyle}>{priorityBadge(t.priorityName)}</td>
                         <td style={tdStyle}>{t.categoryName || "—"}</td>
+                        <td style={tdStyle}>{t.submittedByName || "—"}</td>
                         <td style={tdStyle}>
                           {t.assignedToName || (
                             <span style={{ color: "#9ca3af" }}>Unassigned</span>
@@ -886,6 +521,41 @@ export default function ManagerPage() {
                           {t.dateCreated
                             ? new Date(t.dateCreated).toLocaleDateString()
                             : "—"}
+                        </td>
+
+                        {/* 👇 action buttons */}
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              onClick={() => setSelected(t)}
+                              style={{
+                                background: "#f3f4f6",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "4px 10px",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Details
+                            </button>
+                            <button
+                              onClick={() => setActivityModal(t)}
+                              style={{
+                                background: "#eff6ff",
+                                color: "#1d4ed8",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "4px 10px",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Activity
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -897,7 +567,7 @@ export default function ManagerPage() {
         </div>
       </div>
 
-      {/* ── Ticket detail modal ── */}
+      {/* ── Ticket Details Modal ── */}
       {selected && (
         <TicketDetailModal
           ticket={selected}
@@ -907,6 +577,18 @@ export default function ManagerPage() {
             fetchTickets();
             setSelected(null);
           }}
+          canManage={true}
+          canResolve={false}
+          canComment={false}
+          canAttach={false}
+        />
+      )}
+
+      {/* ── Activity Log Modal ── */}
+      {activityModal && (
+        <ActivityLogModal
+          ticket={activityModal}
+          onClose={() => setActivityModal(null)}
         />
       )}
     </div>
