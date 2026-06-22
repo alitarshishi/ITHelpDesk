@@ -1,14 +1,13 @@
-// ITAgentPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authFetch, logout, getUser } from "../services/authService";
 import TicketDetailModal from "../components/TicketDetailModal";
 import ActivityLogModal from "../components/ActivityLogModal";
-
+import NotificationBell from "../components/NotificationBell";
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
 
-// ── Badges ────────────────────────────────────────────────
+//  Badges
 const statusBadge = (s) => {
   const map = {
     open: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe", icon: "○" },
@@ -75,7 +74,7 @@ const priorityBadge = (p) => {
   );
 };
 
-// ── Main ITAgentPage ──────────────────────────────────────
+//  Main ITAgentPage
 export default function ITAgentPage() {
   const navigate = useNavigate();
   const currentUser = getUser();
@@ -137,7 +136,7 @@ export default function ITAgentPage() {
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
-      {/* ── Navbar ── */}
+      {/*  Navbar  */}
       <nav
         style={{
           background: "#fff",
@@ -178,23 +177,26 @@ export default function ITAgentPage() {
             </div>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            background: "none",
-            border: "1px solid #e5e7eb",
-            borderRadius: "8px",
-            padding: "7px 16px",
-            fontSize: "0.85rem",
-            cursor: "pointer",
-            color: "#374151",
-          }}
-        >
-          Log Out
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <NotificationBell />
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "none",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              padding: "7px 16px",
+              fontSize: "0.85rem",
+              cursor: "pointer",
+              color: "#374151",
+            }}
+          >
+            Log Out
+          </button>
+        </div>
       </nav>
 
-      {/* ── Content ── */}
+      {/*  Content  */}
       <div style={{ padding: "32px" }}>
         <div style={{ marginBottom: "24px" }}>
           <h4 style={{ margin: 0, fontWeight: 700, fontSize: "1.3rem" }}>
@@ -222,7 +224,6 @@ export default function ITAgentPage() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    {/* 👇 added empty column for action buttons */}
                     {[
                       "Ticket ID",
                       "Title",
@@ -300,7 +301,6 @@ export default function ITAgentPage() {
                             : "—"}
                         </td>
 
-                        {/* 👇 action buttons */}
                         <td style={tdStyle}>
                           <div style={{ display: "flex", gap: "6px" }}>
                             <button
@@ -344,7 +344,7 @@ export default function ITAgentPage() {
         )}
       </div>
 
-      {/* ── Details Modal ── */}
+      {/*  Details Modal  */}
       {selected && (
         <TicketDetailModal
           ticket={selected}
@@ -354,10 +354,12 @@ export default function ITAgentPage() {
           canResolve={true}
           canComment={true}
           canAttach={false}
+          canPreviewAttachments={true}
+          canAddNote={true}
         />
       )}
 
-      {/* ── Activity Log Modal ── */}
+      {/*  Activity Log Modal  */}
       {activityModal && (
         <ActivityLogModal
           ticket={activityModal}

@@ -1,8 +1,15 @@
 import ActivityLogModal from "../components/ActivityLogModal";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
+import {
+  useMyTickets,
+  useManagersList,
+  useDeleteTicket,
+} from "../hooks/useMyTickets";
 import { useNavigate } from "react-router-dom";
 import { authFetch, logout, getUser } from "../services/authService";
 import TicketDetailModal from "../components/TicketDetailModal";
+import NotificationBell from "../components/NotificationBell";
+import CreateTicketForm from "../components/forms/CreateTicketForm";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
@@ -17,7 +24,7 @@ const CATEGORIES = [
   "Other",
 ];
 
-// ── Badges ────────────────────────────────────────────────
+//  Badges
 const statusBadge = (s) => {
   const map = {
     open: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
@@ -71,412 +78,27 @@ const priorityBadge = (p) => {
   );
 };
 
-// ── Create Ticket Modal ───────────────────────────────────
-function CreateTicketModal({ onClose, onCreated, managers }) {
-  const currentUser = getUser();
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "Hardware",
-    priority: "Medium",
-    managerId: "",
-  });
-  const [attachments, setAttachments] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const fileInputRef = useRef();
-
-  const handleChange = (e) =>
-    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
-
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    setAttachments((prev) => [...prev, ...files.map((f) => f.name)]);
-    e.target.value = "";
-  };
-
-  const removeAttachment = (index) =>
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-
-  const handleSubmit = async () => {
-    if (!form.title.trim()) {
-      setError("Title is required.");
-      return;
-    }
-    if (!form.description.trim()) {
-      setError("Description is required.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const [catRes, priRes, statRes] = await Promise.all([
-        authFetch(`${API_BASE_URL}/lookup/categories`),
-        authFetch(`${API_BASE_URL}/lookup/priorities`),
-        authFetch(`${API_BASE_URL}/lookup/statuses`),
-      ]);
-      const categories = await catRes.json();
-      const priorities = await priRes.json();
-      const statuses = await statRes.json();
-
-      const categoryId = categories.find(
-        (c) => c.name.toLowerCase() === form.category.toLowerCase(),
-      )?.id;
-      const priorityId = priorities.find(
-        (p) => p.name.toLowerCase() === form.priority.toLowerCase(),
-      )?.id;
-      const statusId = statuses.find(
-        (s) => s.name.toLowerCase() === "open",
-      )?.id;
-
-      if (!categoryId || !priorityId || !statusId) {
-        setError("Could not resolve category, priority, or status.");
-        setLoading(false);
-        return;
-      }
-
-      const res = await authFetch(`${API_BASE_URL}/tickets`, {
-        method: "POST",
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description,
-          categoryId,
-          priorityId,
-          statusId,
-          submittedById: currentUser?.id,
-          assignedToId: form.managerId ? parseInt(form.managerId) : null,
-          attachmentNames: attachments,
-        }),
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => null);
-        setError(d?.message || "Failed to create ticket.");
-        return;
-      }
-      onCreated();
-      onClose();
-    } catch {
-      setError("Could not reach the server.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const inputStyle = {
-    backgroundColor: "#f3f4f6",
-    border: "none",
-    borderRadius: "10px",
-    padding: "11px 14px",
-    width: "100%",
-    fontSize: "0.9rem",
-    outline: "none",
-  };
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1050,
-        overflowY: "auto",
-        padding: "24px",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: "16px",
-          padding: "32px",
-          width: "100%",
-          maxWidth: "560px",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h5 className="mb-0 fw-bold" style={{ fontSize: "1.25rem" }}>
-            Create New Ticket
-          </h5>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "1.4rem",
-              cursor: "pointer",
-              color: "#9ca3af",
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {error && (
-          <div
-            className="alert alert-danger py-2 mb-3"
-            style={{ fontSize: "0.85rem" }}
-          >
-            {error}
-          </div>
-        )}
-
-        <div className="mb-3">
-          <label
-            className="form-label fw-semibold"
-            style={{ fontSize: "0.85rem" }}
-          >
-            Title
-          </label>
-          <input
-            type="text"
-            name="title"
-            placeholder="Brief description of the issue"
-            value={form.title}
-            onChange={handleChange}
-            style={inputStyle}
-          />
-        </div>
-
-        <div className="mb-3">
-          <label
-            className="form-label fw-semibold"
-            style={{ fontSize: "0.85rem" }}
-          >
-            Description
-          </label>
-          <textarea
-            name="description"
-            rows={3}
-            placeholder="Provide detailed information about the issue"
-            value={form.description}
-            onChange={handleChange}
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-
-        <div className="d-flex gap-3 mb-3">
-          <div style={{ flex: 1 }}>
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Category
-            </label>
-            <select
-              name="category"
-              value={form.category}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Priority
-            </label>
-            <select
-              name="priority"
-              value={form.priority}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="mb-3">
-          <label
-            className="form-label fw-semibold"
-            style={{ fontSize: "0.85rem" }}
-          >
-            Ticket Manager{" "}
-            <span style={{ color: "#9ca3af", fontWeight: 400 }}>
-              (optional)
-            </span>
-          </label>
-          <select
-            name="managerId"
-            value={form.managerId}
-            onChange={handleChange}
-            style={inputStyle}
-          >
-            <option value="">— Select a manager —</option>
-            {managers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.userName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mb-4">
-          <label
-            className="form-label fw-semibold"
-            style={{ fontSize: "0.85rem" }}
-          >
-            Attachments
-          </label>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current.click()}
-            style={{
-              background: "#f3f4f6",
-              border: "1px dashed #d1d5db",
-              borderRadius: "10px",
-              padding: "9px 18px",
-              cursor: "pointer",
-              fontSize: "0.85rem",
-              color: "#374151",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            📎 Add Attachment
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-          />
-          {attachments.length > 0 && (
-            <div
-              style={{
-                marginTop: "10px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-              }}
-            >
-              {attachments.map((name, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "#f9fafb",
-                    borderRadius: "8px",
-                    padding: "6px 12px",
-                    fontSize: "0.82rem",
-                    color: "#374151",
-                  }}
-                >
-                  <span>📄 {name}</span>
-                  <button
-                    onClick={() => removeAttachment(i)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#9ca3af",
-                      cursor: "pointer",
-                      fontSize: "1rem",
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="d-flex justify-content-end gap-2">
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "1px solid #d1d5db",
-              borderRadius: "8px",
-              padding: "8px 22px",
-              cursor: "pointer",
-              fontWeight: 500,
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{
-              background: "#111",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "8px 22px",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {loading ? "Creating..." : "Create Ticket"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main EmployeePage ─────────────────────────────────────
+//  Main EmployeePage
 export default function EmployeePage() {
   const navigate = useNavigate();
   const currentUser = getUser();
 
-  const [tickets, setTickets] = useState([]);
-  const [managers, setManagers] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
   const [deleteError, setDeleteError] = useState("");
   const [selected, setSelected] = useState(null);
-  const [activityModal, setActivityModal] = useState(null); // 👈 added
+  const [activityModal, setActivityModal] = useState(null);
+  const {
+    data: tickets = [],
+    isLoading: loading,
+    isError,
+    refetch: fetchMyTickets,
+  } = useMyTickets();
+  const { data: managers = [] } = useManagersList();
+  const deleteTicket = useDeleteTicket();
+  const error = isError ? "Failed to load your tickets." : "";
 
-  const fetchMyTickets = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await authFetch(`${API_BASE_URL}/tickets/my`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setTickets(data);
-    } catch {
-      setError("Failed to load your tickets.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchManagers = async () => {
-    try {
-      const res = await authFetch(`${API_BASE_URL}/users/managers`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setManagers(data);
-    } catch {}
-  };
-
-  useEffect(() => {
-    fetchMyTickets();
-    fetchManagers();
-  }, []);
-
-  const handleDelete = async (ticket) => {
+  const handleDelete = (ticket) => {
     if ((ticket.statusName || "").toLowerCase() !== "open") {
       setDeleteError(
         `TKT-${String(ticket.id).padStart(4, "0")} cannot be deleted — status is "${ticket.statusName}".`,
@@ -490,16 +112,13 @@ export default function EmployeePage() {
       )
     )
       return;
-    try {
-      const res = await authFetch(`${API_BASE_URL}/tickets/${ticket.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error();
-      setTickets((prev) => prev.filter((t) => t.id !== ticket.id));
-    } catch {
-      setDeleteError("Failed to delete ticket.");
-      setTimeout(() => setDeleteError(""), 4000);
-    }
+
+    deleteTicket.mutate(ticket.id, {
+      onError: () => {
+        setDeleteError("Failed to delete ticket.");
+        setTimeout(() => setDeleteError(""), 4000);
+      },
+    });
   };
 
   const handleLogout = async () => {
@@ -534,7 +153,7 @@ export default function EmployeePage() {
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
-      {/* ── Navbar ── */}
+      {/*  Navbar  */}
       <nav
         style={{
           background: "#fff",
@@ -597,6 +216,7 @@ export default function EmployeePage() {
           >
             + Create Ticket
           </button>
+          <NotificationBell />
           <button
             onClick={handleLogout}
             style={{
@@ -614,7 +234,7 @@ export default function EmployeePage() {
         </div>
       </nav>
 
-      {/* ── Content ── */}
+      {/*  Content  */}
       <div style={{ padding: "32px" }}>
         <div style={{ marginBottom: "24px" }}>
           <h4 style={{ margin: 0, fontWeight: 700, fontSize: "1.3rem" }}>
@@ -732,7 +352,6 @@ export default function EmployeePage() {
                             : "—"}
                         </td>
 
-                        {/* 👇 action buttons */}
                         <td style={tdStyle}>
                           <div
                             style={{
@@ -814,16 +433,15 @@ export default function EmployeePage() {
         )}
       </div>
 
-      {/* ── Create Ticket Modal ── */}
+      {/*  Create Ticket Modal  */}
       {showModal && (
-        <CreateTicketModal
-          managers={managers}
+        <CreateTicketForm
           onClose={() => setShowModal(false)}
           onCreated={fetchMyTickets}
         />
       )}
 
-      {/* ── Ticket Details Modal ── */}
+      {/*  Ticket Details Modal  */}
       {selected && (
         <TicketDetailModal
           ticket={selected}
@@ -833,10 +451,12 @@ export default function EmployeePage() {
           canResolve={false}
           canComment={true}
           canAttach={true}
+          canPreviewAttachments={true}
+          canAddNote={false}
         />
       )}
 
-      {/* ── Activity Log Modal ── */}
+      {/*  Activity Log Modal  */}
       {activityModal && (
         <ActivityLogModal
           ticket={activityModal}

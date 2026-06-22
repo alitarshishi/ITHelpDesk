@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authFetch, logout, getUser } from "../services/authService";
 import TicketDetailModal from "../components/TicketDetailModal";
+import NotificationBell from "../components/NotificationBell";
+import DashboardOverview from "../components/dashboard/DashboardOverview";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
@@ -85,11 +87,12 @@ export default function ManagerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
-  const [activityModal, setActivityModal] = useState(null); // 👈 added
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [activityModal, setActivityModal] = useState(null);
   const [search, setSearch] = useState("");
   const [filterPrio, setFilterPrio] = useState("All Priorities");
   const [filterCat, setFilterCat] = useState("All Categories");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -174,42 +177,22 @@ export default function ManagerPage() {
     borderBottom: "1px solid #f3f4f6",
     whiteSpace: "nowrap",
   };
-
-  const statCard = (label, value, sub, accent) => (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "12px",
-        border: "1px solid #e5e7eb",
-        padding: "20px 24px",
-        flex: "1 1 180px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-        }}
-      >
-        <span style={{ fontSize: "0.8rem", color: "#6b7280", fontWeight: 500 }}>
-          {label}
-        </span>
-        <span style={{ fontSize: "1.1rem" }}>{accent}</span>
-      </div>
-      <div
-        style={{
-          fontSize: "2rem",
-          fontWeight: 700,
-          margin: "8px 0 4px",
-          color: "#111",
-        }}
-      >
-        {value}
-      </div>
-      <div style={{ fontSize: "0.78rem", color: "#9ca3af" }}>{sub}</div>
-    </div>
-  );
+  const sidebarLink = (tab) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "10px 16px",
+    borderRadius: "10px",
+    cursor: "pointer",
+    fontWeight: activeTab === tab ? 600 : 400,
+    background: activeTab === tab ? "#111" : "transparent",
+    color: activeTab === tab ? "#fff" : "#374151",
+    fontSize: "0.9rem",
+    border: "none",
+    width: "100%",
+    textAlign: "left",
+    transition: "all 0.15s",
+  });
 
   return (
     <div
@@ -264,6 +247,7 @@ export default function ManagerPage() {
           <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
             👤 {currentUser?.userName || "Manager"}
           </span>
+          <NotificationBell />
           <button
             onClick={handleLogout}
             style={{
@@ -281,293 +265,348 @@ export default function ManagerPage() {
         </div>
       </nav>
 
-      <div style={{ padding: "32px" }}>
-        {/* ── Stat cards ── */}
-        <div
+      <div style={{ display: "flex", flex: 1 }}>
+        <aside
           style={{
-            display: "flex",
-            gap: "16px",
-            flexWrap: "wrap",
-            marginBottom: "32px",
-          }}
-        >
-          {statCard("Total Tickets", total, "All time", "🎫")}
-          {statCard("Open Tickets", openCount, "Awaiting assignment", "🟠")}
-          {statCard("In Progress", inProgCount, "Being worked on", "🔵")}
-          {statCard("Resolved", resolvedCount, "Completed", "🟢")}
-        </div>
-
-        {/* ── Tickets section ── */}
-        <div
-          style={{
+            width: "220px",
+            minHeight: "calc(100vh - 60px)",
             background: "#fff",
-            borderRadius: "12px",
-            border: "1px solid #e5e7eb",
-            overflow: "hidden",
+            borderRight: "1px solid #e5e7eb",
+            padding: "24px 12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+            position: "sticky",
+            top: "60px",
+            alignSelf: "flex-start",
           }}
         >
-          <div style={{ padding: "20px 24px 0" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "16px",
-              }}
-            >
-              <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>
-                Tickets
-              </span>
-              <span style={{ fontSize: "0.82rem", color: "#9ca3af" }}>
-                {filtered.length} of {total} tickets
-              </span>
-            </div>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              padding: "0 16px",
+              marginBottom: "8px",
+            }}
+          >
+            Navigation
+          </p>
+          <button
+            style={sidebarLink("dashboard")}
+            onClick={() => setActiveTab("dashboard")}
+          >
+            📊 Dashboard
+          </button>
+          <button
+            style={sidebarLink("tickets")}
+            onClick={() => setActiveTab("tickets")}
+          >
+            🎫 Tickets
+          </button>
+        </aside>
 
-            {/* Status tabs */}
-            <div
-              style={{
-                display: "flex",
-                background: "#f3f4f6",
-                borderRadius: "8px",
-                padding: "3px",
-                marginBottom: "16px",
-                width: "fit-content",
-              }}
-            >
-              {["All", "Open", "In Progress", "Resolved", "Closed"].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setFilterStatus(s)}
-                  style={{
-                    background: filterStatus === s ? "#fff" : "transparent",
-                    border: "none",
-                    borderRadius: "6px",
-                    padding: "6px 16px",
-                    fontSize: "0.82rem",
-                    fontWeight: filterStatus === s ? 600 : 400,
-                    color: filterStatus === s ? "#111" : "#6b7280",
-                    cursor: "pointer",
-                    boxShadow:
-                      filterStatus === s ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-
-            {/* Search + filters */}
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                marginBottom: "16px",
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ position: "relative", flex: 1, minWidth: "200px" }}>
-                <span
-                  style={{
-                    position: "absolute",
-                    left: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#9ca3af",
-                  }}
-                >
-                  🔍
-                </span>
-                <input
-                  placeholder="Search tickets..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "9px 14px 9px 36px",
-                    borderRadius: "8px",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "0.85rem",
-                    outline: "none",
-                    background: "#f9fafb",
-                  }}
-                />
-              </div>
-              <select
-                value={filterPrio}
-                onChange={(e) => setFilterPrio(e.target.value)}
+        <main style={{ flex: 1, padding: "32px", overflow: "auto" }}>
+          {activeTab === "dashboard" && <DashboardOverview />}
+          {activeTab === "tickets" && (
+            <>
+              {/*  Tickets section  */}
+              <div
                 style={{
-                  padding: "9px 14px",
-                  borderRadius: "8px",
+                  background: "#fff",
+                  borderRadius: "12px",
                   border: "1px solid #e5e7eb",
-                  fontSize: "0.85rem",
-                  background: "#f9fafb",
-                  outline: "none",
-                  cursor: "pointer",
+                  overflow: "hidden",
                 }}
               >
-                <option>All Priorities</option>
-                {["Low", "Medium", "High", "Critical"].map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-              <select
-                value={filterCat}
-                onChange={(e) => setFilterCat(e.target.value)}
-                style={{
-                  padding: "9px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid #e5e7eb",
-                  fontSize: "0.85rem",
-                  background: "#f9fafb",
-                  outline: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <option>All Categories</option>
-                {categories.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+                <div style={{ padding: "20px 24px 0" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>
+                      Tickets
+                    </span>
+                    <span style={{ fontSize: "0.82rem", color: "#9ca3af" }}>
+                      {filtered.length} of {total} tickets
+                    </span>
+                  </div>
 
-          {loading && (
-            <p style={{ padding: "24px", color: "#6b7280" }}>
-              Loading tickets...
-            </p>
-          )}
-          {error && <div className="alert alert-danger m-3">{error}</div>}
+                  {/* Status tabs */}
+                  <div
+                    style={{
+                      display: "flex",
+                      background: "#f3f4f6",
+                      borderRadius: "8px",
+                      padding: "3px",
+                      marginBottom: "16px",
+                      width: "fit-content",
+                    }}
+                  >
+                    {["All", "Open", "In Progress", "Resolved", "Closed"].map(
+                      (s) => (
+                        <button
+                          key={s}
+                          onClick={() => setFilterStatus(s)}
+                          style={{
+                            background:
+                              filterStatus === s ? "#fff" : "transparent",
+                            border: "none",
+                            borderRadius: "6px",
+                            padding: "6px 16px",
+                            fontSize: "0.82rem",
+                            fontWeight: filterStatus === s ? 600 : 400,
+                            color: filterStatus === s ? "#111" : "#6b7280",
+                            cursor: "pointer",
+                            boxShadow:
+                              filterStatus === s
+                                ? "0 1px 3px rgba(0,0,0,0.1)"
+                                : "none",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {s}
+                        </button>
+                      ),
+                    )}
+                  </div>
 
-          {!loading && !error && (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    {/* 👇 added empty column for action buttons */}
-                    {[
-                      "Ticket ID",
-                      "Title",
-                      "Status",
-                      "Priority",
-                      "Category",
-                      "Created By",
-                      "Assigned To",
-                      "Created",
-                      "",
-                    ].map((h) => (
-                      <th key={h} style={thStyle}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={9}
+                  {/* Search + filters */}
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      marginBottom: "16px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "relative",
+                        flex: 1,
+                        minWidth: "200px",
+                      }}
+                    >
+                      <span
                         style={{
-                          ...tdStyle,
-                          textAlign: "center",
+                          position: "absolute",
+                          left: "12px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
                           color: "#9ca3af",
-                          padding: "48px",
                         }}
                       >
-                        No tickets found
-                      </td>
-                    </tr>
-                  ) : (
-                    filtered.map((t) => (
-                      <tr
-                        key={t.id}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = "#f9fafb")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <td
-                          style={{
-                            ...tdStyle,
-                            fontWeight: 600,
-                            color: "#111",
-                            fontFamily: "monospace",
-                          }}
-                        >
-                          TKT-{String(t.id).padStart(4, "0")}
-                        </td>
-                        <td
-                          style={{
-                            ...tdStyle,
-                            maxWidth: "260px",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.title}
-                        </td>
-                        <td style={tdStyle}>{statusBadge(t.statusName)}</td>
-                        <td style={tdStyle}>{priorityBadge(t.priorityName)}</td>
-                        <td style={tdStyle}>{t.categoryName || "—"}</td>
-                        <td style={tdStyle}>{t.submittedByName || "—"}</td>
-                        <td style={tdStyle}>
-                          {t.assignedToName || (
-                            <span style={{ color: "#9ca3af" }}>Unassigned</span>
-                          )}
-                        </td>
-                        <td style={{ ...tdStyle, color: "#9ca3af" }}>
-                          {t.dateCreated
-                            ? new Date(t.dateCreated).toLocaleDateString()
-                            : "—"}
-                        </td>
+                        🔍
+                      </span>
+                      <input
+                        placeholder="Search tickets..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "9px 14px 9px 36px",
+                          borderRadius: "8px",
+                          border: "1px solid #e5e7eb",
+                          fontSize: "0.85rem",
+                          outline: "none",
+                          background: "#f9fafb",
+                        }}
+                      />
+                    </div>
+                    <select
+                      value={filterPrio}
+                      onChange={(e) => setFilterPrio(e.target.value)}
+                      style={{
+                        padding: "9px 14px",
+                        borderRadius: "8px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "0.85rem",
+                        background: "#f9fafb",
+                        outline: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option>All Priorities</option>
+                      {["Low", "Medium", "High", "Critical"].map((p) => (
+                        <option key={p}>{p}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={filterCat}
+                      onChange={(e) => setFilterCat(e.target.value)}
+                      style={{
+                        padding: "9px 14px",
+                        borderRadius: "8px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "0.85rem",
+                        background: "#f9fafb",
+                        outline: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option>All Categories</option>
+                      {categories.map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                        {/* 👇 action buttons */}
-                        <td style={tdStyle}>
-                          <div style={{ display: "flex", gap: "6px" }}>
-                            <button
-                              onClick={() => setSelected(t)}
+                {loading && (
+                  <p style={{ padding: "24px", color: "#6b7280" }}>
+                    Loading tickets...
+                  </p>
+                )}
+                {error && <div className="alert alert-danger m-3">{error}</div>}
+
+                {!loading && !error && (
+                  <div style={{ overflowX: "auto" }}>
+                    <table
+                      style={{ width: "100%", borderCollapse: "collapse" }}
+                    >
+                      <thead>
+                        <tr>
+                          {[
+                            "Ticket ID",
+                            "Title",
+                            "Status",
+                            "Priority",
+                            "Category",
+                            "Created By",
+                            "Assigned To",
+                            "Created",
+                            "",
+                          ].map((h) => (
+                            <th key={h} style={thStyle}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={9}
                               style={{
-                                background: "#f3f4f6",
-                                border: "none",
-                                borderRadius: "6px",
-                                padding: "4px 10px",
-                                fontSize: "0.75rem",
-                                fontWeight: 600,
-                                cursor: "pointer",
+                                ...tdStyle,
+                                textAlign: "center",
+                                color: "#9ca3af",
+                                padding: "48px",
                               }}
                             >
-                              Details
-                            </button>
-                            <button
-                              onClick={() => setActivityModal(t)}
-                              style={{
-                                background: "#eff6ff",
-                                color: "#1d4ed8",
-                                border: "none",
-                                borderRadius: "6px",
-                                padding: "4px 10px",
-                                fontSize: "0.75rem",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
+                              No tickets found
+                            </td>
+                          </tr>
+                        ) : (
+                          filtered.map((t) => (
+                            <tr
+                              key={t.id}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background = "#f9fafb")
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.background =
+                                  "transparent")
+                              }
                             >
-                              Activity
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                              <td
+                                style={{
+                                  ...tdStyle,
+                                  fontWeight: 600,
+                                  color: "#111",
+                                  fontFamily: "monospace",
+                                }}
+                              >
+                                TKT-{String(t.id).padStart(4, "0")}
+                              </td>
+                              <td
+                                style={{
+                                  ...tdStyle,
+                                  maxWidth: "260px",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {t.title}
+                              </td>
+                              <td style={tdStyle}>
+                                {statusBadge(t.statusName)}
+                              </td>
+                              <td style={tdStyle}>
+                                {priorityBadge(t.priorityName)}
+                              </td>
+                              <td style={tdStyle}>{t.categoryName || "—"}</td>
+                              <td style={tdStyle}>
+                                {t.submittedByName || "—"}
+                              </td>
+                              <td style={tdStyle}>
+                                {t.assignedToName || (
+                                  <span style={{ color: "#9ca3af" }}>
+                                    Unassigned
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ ...tdStyle, color: "#9ca3af" }}>
+                                {t.dateCreated
+                                  ? new Date(t.dateCreated).toLocaleDateString()
+                                  : "—"}
+                              </td>
+
+                              {/*  action buttons */}
+                              <td style={tdStyle}>
+                                <div style={{ display: "flex", gap: "6px" }}>
+                                  <button
+                                    onClick={() => setSelected(t)}
+                                    style={{
+                                      background: "#f3f4f6",
+                                      border: "none",
+                                      borderRadius: "6px",
+                                      padding: "4px 10px",
+                                      fontSize: "0.75rem",
+                                      fontWeight: 600,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Details
+                                  </button>
+                                  <button
+                                    onClick={() => setActivityModal(t)}
+                                    style={{
+                                      background: "#eff6ff",
+                                      color: "#1d4ed8",
+                                      border: "none",
+                                      borderRadius: "6px",
+                                      padding: "4px 10px",
+                                      fontSize: "0.75rem",
+                                      fontWeight: 600,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Activity
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
           )}
-        </div>
+        </main>
       </div>
 
-      {/* ── Ticket Details Modal ── */}
+      {/*  Ticket Details Modal  */}
       {selected && (
         <TicketDetailModal
           ticket={selected}
@@ -581,10 +620,12 @@ export default function ManagerPage() {
           canResolve={false}
           canComment={false}
           canAttach={false}
+          canPreviewAttachments={false}
+          canAddNote={false}
         />
       )}
 
-      {/* ── Activity Log Modal ── */}
+      {/*  Activity Log Modal  */}
       {activityModal && (
         <ActivityLogModal
           ticket={activityModal}

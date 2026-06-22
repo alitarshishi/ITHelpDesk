@@ -1,4 +1,3 @@
-// src/components/TicketDetailModal.jsx
 import React, { useState, useEffect } from "react";
 import { authFetch, getUser } from "../services/authService";
 
@@ -17,6 +16,12 @@ const statusBadge = (s) => {
     },
     resolved: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0", icon: "✓" },
     closed: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb", icon: "✓" },
+    escalated: {
+      bg: "#fef2f2",
+      color: "#b91c1c",
+      border: "#fecaca",
+      icon: "⚠",
+    },
   };
   const key = (s || "").toLowerCase();
   const st = map[key] || {
@@ -75,26 +80,27 @@ const priorityBadge = (p) => {
 const fileIcon = (name) => {
   const ext = (name || "").split(".").pop()?.toLowerCase();
   if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "🖼️";
-  if (["pdf"].includes(ext)) return "📕";
+  if (ext === "pdf") return "📕";
   if (["doc", "docx"].includes(ext)) return "📄";
   if (["xls", "xlsx", "csv"].includes(ext)) return "📊";
   if (["zip", "rar", "7z"].includes(ext)) return "🗜️";
   return "📎";
 };
 
-const MANAGER_ALLOWED_STATUSES = ["Open", "Resolved", "In Progress", "Closed"]; // shown only when current is Open/Resolved
-const AGENT_STATUS_OPTIONS = ["Resolved"]; // agent can only move ticket to Resolved
+const MANAGER_ALLOWED_STATUSES = ["Open", "In Progress", "Resolved", "Closed"];
 
 // ─────────────────────────────────────────────────────────
 // Props:
-//   ticket        — ticket object to display
-//   onClose       — called when modal closes
-//   onUpdated     — called after a save (status/reassign/comment/attachment)
-//   itAgents      — [{id, userName}] for manager reassign dropdown
-//   canManage     — true = Manager (status only if Open/Resolved, + Reassign)
-//   canResolve    — true = IT Agent (status -> Resolved only)
-//   canComment    — true = show comment box
-//   canAttach     — true = show "Add Attachment" (Employee only)
+//   ticket      — ticket object
+//   onClose     — close modal
+//   onUpdated   — refresh parent list after any change
+//   itAgents    — [{id, userName}] for manager reassign dropdown
+//   canManage   — Manager: status (only if Open/Resolved) + Reassign
+//   canResolve  — IT Agent: button to set status -> Resolved
+//   canComment  — show comment box (Employee + IT Agent)
+//   canAttach   — show "Add Attachment" button (Employee only)
+//   canPreviewAttachments — show attachment list (Employee + IT Agent)
+//   canAddNote  — IT Agent only: internal work-log note (not a comment)
 // ─────────────────────────────────────────────────────────
 export default function TicketDetailModal({
   ticket,
@@ -105,6 +111,8 @@ export default function TicketDetailModal({
   canResolve = false,
   canComment = true,
   canAttach = false,
+  canPreviewAttachments = true,
+  canAddNote = false,
 }) {
   const currentUser = getUser();
 
@@ -116,10 +124,9 @@ export default function TicketDetailModal({
 
   const [attachments, setAttachments] = useState([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
-  const [newFileName, setNewFileName] = useState("");
-  const [attaching, setAttaching] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [attachError, setAttachError] = useState("");
-
+  const fileInputRef = React.useRef();
   // manager-only state
   const [activeAction, setActiveAction] = useState(null); // "status" | "reassign"
   const [status, setStatus] = useState(ticket.statusName ?? "Open");
@@ -130,12 +137,22 @@ export default function TicketDetailModal({
   // agent-only state
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
+  const [escalating, setEscalating] = useState(false);
+  const [escalateError, setEscalateError] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [submittingNote, setSubmittingNote] = useState(false);
+  const [noteError, setNoteError] = useState("");
 
   const currentStatusLower = (ticket.statusName || "").toLowerCase();
   const managerCanChangeStatus =
-    currentStatusLower === "open" || currentStatusLower === "resolved";
+    currentStatusLower === "open" ||
+    currentStatusLower === "resolved" ||
+    currentStatusLower === "escalated";
+  const canShowResolveButton =
+    canResolve &&
+    currentStatusLower !== "resolved" &&
+    currentStatusLower !== "closed";
 
-  // ── Fetch comments + attachments ─────────────────────
   useEffect(() => {
     fetchComments();
     fetchAttachments();
@@ -170,8 +187,55 @@ export default function TicketDetailModal({
       setLoadingAttachments(false);
     }
   };
+  // ── Real file upload ──
+  const handleFileSelected = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
 
-  // ── Add comment ─────────────────────────────────────
+    setUploading(true);
+    setAttachError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `${API_BASE_URL}/tickets/${ticket.id}/attachments`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }, // no Content-Type — browser sets multipart boundary
+          body: formData,
+        },
+      );
+
+      if (!res.ok) {
+        setAttachError("Failed to upload file.");
+        return;
+      }
+      await fetchAttachments();
+      onUpdated?.();
+    } catch {
+      setAttachError("Could not reach the server.");
+    } finally {
+      setUploading(false);
+    }
+  };
+  // ── Open/preview a file ──
+  const handleViewAttachment = async (attachmentId) => {
+    const token = localStorage.getItem("token");
+    const res = await fetch(
+      `${API_BASE_URL}/tickets/attachments/${attachmentId}/view`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank"); // opens image/PDF in a new tab, browser renders it natively
+  };
+  // ── Add comment (employee ↔ agent conversation) ─────
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
     setSubmitting(true);
@@ -216,6 +280,7 @@ export default function TicketDetailModal({
         return;
       }
       setNewFileName("");
+      setShowAttachInput(false);
       await fetchAttachments();
       onUpdated?.();
     } catch {
@@ -230,9 +295,6 @@ export default function TicketDetailModal({
     setSaving(true);
     setManageError("");
     try {
-      const statRes = await authFetch(`${API_BASE_URL}/lookup/statuses`);
-      const statuses = await statRes.json();
-
       const body = { priorityId: null, statusId: null, assignedToId: null };
 
       if (activeAction === "status") {
@@ -243,6 +305,8 @@ export default function TicketDetailModal({
           setSaving(false);
           return;
         }
+        const statRes = await authFetch(`${API_BASE_URL}/lookup/statuses`);
+        const statuses = await statRes.json();
         const statusId = statuses.find(
           (s) => s.name.toLowerCase() === status.toLowerCase(),
         )?.id;
@@ -316,8 +380,66 @@ export default function TicketDetailModal({
       setResolving(false);
     }
   };
+  const handleEscalate = async () => {
+    if (!window.confirm("Escalate this ticket to your manager?")) return;
+    setEscalating(true);
+    setEscalateError("");
+    try {
+      const statRes = await authFetch(`${API_BASE_URL}/lookup/statuses`);
+      const statuses = await statRes.json();
+      const statusId = statuses.find(
+        (s) => s.name.toLowerCase() === "escalated",
+      )?.id;
+      if (!statusId) {
+        setEscalateError("Could not resolve status.");
+        setEscalating(false);
+        return;
+      }
 
-  // ── Info row helper ─────────────────────────────────
+      const res = await authFetch(
+        `${API_BASE_URL}/itagent/${ticket.id}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ statusId }),
+        },
+      );
+
+      if (!res.ok) {
+        setEscalateError("Failed to escalate.");
+        return;
+      }
+      onUpdated?.();
+      onClose();
+    } catch {
+      setEscalateError("Could not reach the server.");
+    } finally {
+      setEscalating(false);
+    }
+  };
+
+  // ── IT Agent — internal work-log note ───────────────
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return;
+    setSubmittingNote(true);
+    setNoteError("");
+    try {
+      const res = await authFetch(`${API_BASE_URL}/itagent/${ticket.id}/note`, {
+        method: "POST",
+        body: JSON.stringify({ text: newNote }),
+      });
+      if (!res.ok) {
+        setNoteError("Failed to add note.");
+        return;
+      }
+      setNewNote("");
+      onUpdated?.(); // activity log will pick it up next time it's opened
+    } catch {
+      setNoteError("Could not reach the server.");
+    } finally {
+      setSubmittingNote(false);
+    }
+  };
+
   const infoRow = (icon, label, value) => (
     <div style={{ flex: "1 1 45%", minWidth: "180px" }}>
       <div
@@ -338,11 +460,6 @@ export default function TicketDetailModal({
       </div>
     </div>
   );
-
-  const canShowResolveButton =
-    canResolve &&
-    currentStatusLower !== "resolved" &&
-    currentStatusLower !== "closed";
 
   return (
     <div
@@ -431,12 +548,12 @@ export default function TicketDetailModal({
         <div style={{ padding: "0 28px 20px" }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
             {infoRow("👤", "Created by", ticket.submittedByName)}
+            {infoRow("🧑‍💼", "Assigned by", ticket.assignedByManagerName || "—")}
             {infoRow(
               "👤",
               "Assigned to",
               ticket.assignedToName || "Unassigned",
             )}
-            {infoRow("🧑‍💼", "Assigned by", ticket.assignedByManagerName || "—")}
             {infoRow("🏷️", "Category", ticket.categoryName)}
             {infoRow(
               "📅",
@@ -633,110 +750,87 @@ export default function TicketDetailModal({
                   {resolveError}
                 </div>
               )}
-              <button
-                onClick={handleResolve}
-                disabled={resolving}
-                style={{
-                  background: "#16a34a",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "8px",
-                  padding: "8px 18px",
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                }}
-              >
-                {resolving ? "Updating..." : "✓ Mark as Resolved"}
-              </button>
+              {escalateError && (
+                <div
+                  className="alert alert-danger py-2 mb-3"
+                  style={{ fontSize: "0.85rem" }}
+                >
+                  {escalateError}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={handleResolve}
+                  disabled={resolving}
+                  style={{
+                    background: "#16a34a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "8px 18px",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  {resolving ? "Updating..." : "✓ Mark as Resolved"}
+                </button>
+                <button
+                  onClick={handleEscalate}
+                  disabled={escalating}
+                  style={{
+                    background: "#fff",
+                    color: "#b91c1c",
+                    border: "1px solid #fca5a5",
+                    borderRadius: "8px",
+                    padding: "8px 18px",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  {escalating ? "Escalating..." : "⚠ Escalate"}
+                </button>
+              </div>
             </div>
             <hr style={{ margin: "0 28px 20px", borderColor: "#f3f4f6" }} />
           </>
         )}
 
-        {/* ── Attachments ── */}
-        <div style={{ padding: "0 28px 20px" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "12px",
-            }}
-          >
-            <span>📎</span>
-            <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>
-              Attachments
-            </span>
-          </div>
-
-          {loadingAttachments && (
-            <p style={{ color: "#9ca3af", fontSize: "0.85rem" }}>
-              Loading attachments...
-            </p>
-          )}
-          {!loadingAttachments && attachments.length === 0 && (
-            <p
-              style={{
-                color: "#9ca3af",
-                fontSize: "0.85rem",
-                marginBottom: "12px",
-              }}
-            >
-              No attachments yet.
-            </p>
-          )}
-
-          {attachments.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-                marginBottom: "14px",
-              }}
-            >
-              {attachments.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "#f9fafb",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
-                    fontSize: "0.83rem",
-                    color: "#374151",
-                  }}
-                >
-                  <span>
-                    {fileIcon(a.fileName)} {a.fileName}
-                  </span>
-                  <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>
-                    {a.uploadedByName}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {canAttach && (
-            <>
-              {attachError && (
+        {/* ── IT Agent — internal work-log note ── */}
+        {canAddNote && (
+          <>
+            <div style={{ padding: "0 28px 20px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "10px",
+                }}
+              >
+                <span>📝</span>
+                <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>
+                  Work Log
+                </span>
+                <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>
+                  (only visible in Activity Log)
+                </span>
+              </div>
+              {noteError && (
                 <div
                   className="alert alert-danger py-2 mb-2"
                   style={{ fontSize: "0.82rem" }}
                 >
-                  {attachError}
+                  {noteError}
                 </div>
               )}
               <div style={{ display: "flex", gap: "8px" }}>
                 <input
                   type="text"
-                  placeholder="Enter file name (e.g. screenshot.png)"
-                  value={newFileName}
-                  onChange={(e) => setNewFileName(e.target.value)}
+                  placeholder="e.g. Investigated issue, waiting on vendor reply..."
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
                   style={{
                     flex: 1,
                     padding: "10px 12px",
@@ -748,8 +842,8 @@ export default function TicketDetailModal({
                   }}
                 />
                 <button
-                  onClick={handleAddAttachment}
-                  disabled={attaching || !newFileName.trim()}
+                  onClick={handleAddNote}
+                  disabled={submittingNote || !newNote.trim()}
                   style={{
                     background: "#111",
                     color: "#fff",
@@ -758,20 +852,134 @@ export default function TicketDetailModal({
                     padding: "0 16px",
                     fontWeight: 600,
                     fontSize: "0.85rem",
-                    cursor: !newFileName.trim() ? "not-allowed" : "pointer",
-                    opacity: !newFileName.trim() ? 0.5 : 1,
+                    cursor: !newNote.trim() ? "not-allowed" : "pointer",
+                    opacity: !newNote.trim() ? 0.5 : 1,
                   }}
                 >
-                  {attaching ? "..." : "Add"}
+                  {submittingNote ? "..." : "Log"}
                 </button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+            <hr style={{ margin: "0 28px 20px", borderColor: "#f3f4f6" }} />
+          </>
+        )}
+
+        {/* ── Attachments ── */}
+        {canPreviewAttachments && (
+          <div style={{ padding: "0 28px 20px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "12px",
+              }}
+            >
+              <span>📎</span>
+              <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>
+                Attachments
+              </span>
+            </div>
+
+            {loadingAttachments && (
+              <p style={{ color: "#9ca3af", fontSize: "0.85rem" }}>
+                Loading attachments...
+              </p>
+            )}
+            {!loadingAttachments && attachments.length === 0 && (
+              <p
+                style={{
+                  color: "#9ca3af",
+                  fontSize: "0.85rem",
+                  marginBottom: "12px",
+                }}
+              >
+                No attachments yet.
+              </p>
+            )}
+
+            {attachments.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
+                  marginBottom: "14px",
+                }}
+              >
+                {attachments.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => handleViewAttachment(a.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#f9fafb",
+                      borderRadius: "8px",
+                      padding: "8px 12px",
+                      fontSize: "0.83rem",
+                      color: "#1d4ed8",
+                      border: "none",
+                      width: "100%",
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span>
+                      {fileIcon(a.fileName)} {a.fileName}
+                    </span>
+                    <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>
+                      {a.uploadedByName}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {canAttach && (
+              <>
+                {attachError && (
+                  <div
+                    className="alert alert-danger py-2 mb-2"
+                    style={{ fontSize: "0.82rem" }}
+                  >
+                    {attachError}
+                  </div>
+                )}
+                <button
+                  onClick={() => fileInputRef.current.click()}
+                  disabled={uploading}
+                  style={{
+                    background: "#f3f4f6",
+                    border: "1px dashed #d1d5db",
+                    borderRadius: "8px",
+                    padding: "8px 16px",
+                    fontSize: "0.83rem",
+                    fontWeight: 600,
+                    color: "#374151",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  📎 {uploading ? "Uploading..." : "Add Attachment"}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  style={{ display: "none" }}
+                  onChange={handleFileSelected}
+                />
+              </>
+            )}
+          </div>
+        )}
 
         <hr style={{ margin: "0 28px 20px", borderColor: "#f3f4f6" }} />
 
-        {/* ── Activity / Comments ── */}
+        {/* ── Comments ── */}
         <div style={{ padding: "0 28px 28px" }}>
           <div
             style={{
