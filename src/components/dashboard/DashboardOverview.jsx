@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useDashboardStats } from "../../hooks/useDashboardStats";
 import PeriodSelector from "./PeriodSelector";
 import StatCard from "./StatCard";
@@ -6,10 +6,12 @@ import TicketsOverTimeChart from "./TicketsOverTimeChart";
 import StatusPieChart from "./StatusPieChart";
 import PriorityBarChart from "./PriorityBarChart";
 import CategoryBarChart from "./CategoryBarChart";
+import ExportButtons from "./ExportButtons";
 
 export default function DashboardOverview() {
   const [period, setPeriod] = useState("week");
   const { data, isLoading, isError } = useDashboardStats(period);
+  const dashboardRef = useRef(null);
 
   return (
     <div>
@@ -30,6 +32,7 @@ export default function DashboardOverview() {
           </p>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
+        <ExportButtons dashboardRef={dashboardRef} period={period} />
       </div>
 
       {isLoading && <p style={{ color: "#6b7280" }}>Loading dashboard...</p>}
@@ -40,7 +43,7 @@ export default function DashboardOverview() {
       )}
 
       {data && (
-        <>
+        <div ref={dashboardRef}>
           <div
             style={{
               display: "flex",
@@ -105,7 +108,7 @@ export default function DashboardOverview() {
           <div style={{ marginTop: "20px" }}>
             <CategoryBarChart data={data.categoryBreakdown} />
           </div>
-        </>
+        </div>
       )}
     </div>
   );
