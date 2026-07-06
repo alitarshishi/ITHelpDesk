@@ -75,15 +75,30 @@ export function isAuthenticated() {
 export async function authFetch(input, init = {}) {
   const token = getToken();
   const headers = new Headers(init.headers || {});
+
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  headers.set("Content-Type", "application/json");
+
+  // Don't force Content-Type for FormData — browser sets multipart boundary
+  if (!(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
 
   const response = await fetch(input, { ...init, headers });
 
-  // token expired → force re-login
   if (response.status === 401) {
+    let message = "Your session has expired. Please sign in again.";
+
+    try {
+      const data = await response.clone().json();
+      if (data?.message?.toLowerCase().includes("deactivated")) {
+        message =
+          "Your account has been deactivated. Contact your administrator.";
+      }
+    } catch {}
+
     clearAuth();
-    window.location.href = "/login";
+    sessionStorage.setItem("loginNotice", message);
+    window.location.href = "/";
     return;
   }
 

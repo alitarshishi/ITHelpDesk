@@ -1,50 +1,49 @@
 import React from "react";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell } from "recharts";
+import { Card } from "@/components/ui/card";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
-const COLORS = {
-  Low: "#3b82f6",
-  Medium: "#f59e0b",
-  High: "#f97316",
-  Critical: "#7f1d1d",
+const chartConfig = {
+  Low: { label: "Low", color: "hsl(217 91% 60%)" },
+  Medium: { label: "Medium", color: "hsl(38 92% 50%)" },
+  High: { label: "High", color: "hsl(25 95% 53%)" },
+  Critical: { label: "Critical", color: "hsl(0 74% 35%)" },
 };
 
 export default function PriorityBarChart({ data }) {
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "12px",
-        border: "1px solid #e5e7eb",
-        padding: "20px 24px",
-      }}
-    >
-      <h6
-        style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "16px" }}
-      >
-        By Priority
-      </h6>
-      <ResponsiveContainer width="100%" height={260}>
+    <Card className="p-5">
+      <h3 className="mb-4 text-sm font-semibold">By Priority</h3>
+      <ChartContainer config={chartConfig} className="h-[260px] w-full">
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-          <XAxis dataKey="priority" tick={{ fontSize: 12 }} />
-          <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-          <Tooltip />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="priority"
+            tickLine={false}
+            axisLine={false}
+            fontSize={12}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            allowDecimals={false}
+            fontSize={12}
+          />
+          <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="count" radius={[6, 6, 0, 0]}>
             {data.map((entry, i) => (
-              <Cell key={i} fill={COLORS[entry.priority] || "#9ca3af"} />
+              <Cell
+                key={i}
+                fill={chartConfig[entry.priority]?.color || "hsl(220 9% 70%)"}
+              />
             ))}
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      </ChartContainer>
+    </Card>
   );
 }

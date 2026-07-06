@@ -1,43 +1,49 @@
 import React from "react";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Card } from "@/components/ui/card";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+
+const chartConfig = {
+  count: {
+    label: "Tickets",
+    color: "hsl(217 91% 60%)",
+  },
+};
 
 export default function CategoryBarChart({ data }) {
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "12px",
-        border: "1px solid #e5e7eb",
-        padding: "20px 24px",
-      }}
-    >
-      <h6
-        style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "16px" }}
-      >
-        By Category
-      </h6>
-      <ResponsiveContainer width="100%" height={260}>
+    <Card className="p-5">
+      <h3 className="mb-4 text-sm font-semibold">By Category</h3>
+      <ChartContainer config={chartConfig} className="h-[260px] w-full">
         <BarChart data={data} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-          <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+          <XAxis
+            type="number"
+            tickLine={false}
+            axisLine={false}
+            allowDecimals={false}
+            fontSize={12}
+          />
           <YAxis
             type="category"
             dataKey="category"
-            tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             width={80}
+            fontSize={12}
           />
-          <Tooltip />
-          <Bar dataKey="count" fill="#1d4ed8" radius={[0, 6, 6, 0]} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Bar
+            dataKey="count"
+            fill="var(--color-count)"
+            radius={[0, 6, 6, 0]}
+          />
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      </ChartContainer>
+    </Card>
   );
 }

@@ -1,7 +1,25 @@
-import React, { useState } from "react";
+import React from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { authFetch } from "../../services/authService";
+import { toast } from "sonner";
+import { authFetch } from "@/services/authService";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
@@ -15,18 +33,18 @@ const ROLES = [
 
 export default function CreateUserForm({ onClose, onCreated }) {
   const queryClient = useQueryClient();
-  const [serverError, setServerError] = useState("");
 
   const {
     register,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors },
   } = useForm({
-    defaultValues: { userName: "", email: "", password: "", roleId: 2 },
+    defaultValues: { userName: "", email: "", password: "", roleId: "2" },
   });
 
-  const password = watch("password");
+  const roleId = watch("roleId");
 
   const createUser = useMutation({
     mutationFn: async (values) => {
@@ -42,96 +60,28 @@ export default function CreateUserForm({ onClose, onCreated }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success("User created successfully.");
       onCreated();
       onClose();
     },
-    onError: (err) => setServerError(err.message),
+    onError: (err) => toast.error(err.message),
   });
 
-  const onSubmit = (values) => {
-    setServerError("");
-    createUser.mutate(values);
-  };
-
-  const inputStyle = {
-    backgroundColor: "#f3f4f6",
-    border: "none",
-    borderRadius: "10px",
-    padding: "11px 14px",
-    width: "100%",
-    fontSize: "0.9rem",
-    outline: "none",
-  };
-  const errorTextStyle = {
-    fontSize: "0.78rem",
-    color: "#dc2626",
-    marginTop: "4px",
-  };
+  const onSubmit = (values) => createUser.mutate(values);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1050,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: "16px",
-          padding: "32px",
-          width: "100%",
-          maxWidth: "480px",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h5 className="mb-0 fw-bold" style={{ fontSize: "1.25rem" }}>
-            Create New User
-          </h5>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "1.4rem",
-              cursor: "pointer",
-              color: "#9ca3af",
-            }}
-          >
-            ×
-          </button>
-        </div>
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create New User</DialogTitle>
+        </DialogHeader>
 
-        {serverError && (
-          <div
-            className="alert alert-danger py-2 mb-3"
-            style={{ fontSize: "0.85rem" }}
-          >
-            {serverError}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Username */}
-          <div className="mb-3">
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Username
-            </label>
-            <input
-              type="text"
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="userName">Username</Label>
+            <Input
+              id="userName"
               placeholder="Enter username"
-              style={inputStyle}
               {...register("userName", {
                 required: "Username is required.",
                 minLength: {
@@ -141,22 +91,18 @@ export default function CreateUserForm({ onClose, onCreated }) {
               })}
             />
             {errors.userName && (
-              <p style={errorTextStyle}>{errors.userName.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.userName.message}
+              </p>
             )}
           </div>
 
-          {/* Email */}
-          <div className="mb-3">
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Email
-            </label>
-            <input
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
               type="email"
               placeholder="Enter email address"
-              style={inputStyle}
               {...register("email", {
                 required: "Email is required.",
                 pattern: {
@@ -166,22 +112,16 @@ export default function CreateUserForm({ onClose, onCreated }) {
               })}
             />
             {errors.email && (
-              <p style={errorTextStyle}>{errors.email.message}</p>
+              <p className="text-sm text-destructive">{errors.email.message}</p>
             )}
           </div>
 
-          {/* Password */}
-          <div className="mb-3">
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Password
-            </label>
-            <input
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
               type="password"
               placeholder="Enter password"
-              style={inputStyle}
               {...register("password", {
                 required: "Password is required.",
                 minLength: {
@@ -191,60 +131,38 @@ export default function CreateUserForm({ onClose, onCreated }) {
               })}
             />
             {errors.password && (
-              <p style={errorTextStyle}>{errors.password.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.password.message}
+              </p>
             )}
           </div>
 
-          {/* Role */}
-          <div className="mb-4">
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Role
-            </label>
-            <select style={inputStyle} {...register("roleId")}>
-              {ROLES.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-1.5">
+            <Label>Role</Label>
+            <Select value={roleId} onValueChange={(v) => setValue("roleId", v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => (
+                  <SelectItem key={r.id} value={String(r.id)}>
+                    {r.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="d-flex justify-content-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "1px solid #d1d5db",
-                borderRadius: "8px",
-                padding: "8px 22px",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-            >
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={createUser.isPending}
-              style={{
-                background: "#111",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 22px",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
+            </Button>
+            <Button type="submit" disabled={createUser.isPending}>
               {createUser.isPending ? "Creating..." : "Create User"}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

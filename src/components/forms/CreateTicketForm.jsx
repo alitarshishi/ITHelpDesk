@@ -1,7 +1,27 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authFetch, getUser } from "../../services/authService";
+import { toast } from "sonner";
+import { authFetch, getUser } from "@/services/authService";
+import VoiceTicketInput from "./VoiceTicketInput";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
@@ -16,7 +36,6 @@ const CATEGORIES = [
   "Other",
 ];
 
-//  React Query: fetch lookups once, cached
 function useLookups() {
   return useQuery({
     queryKey: ["lookups"],
@@ -32,7 +51,7 @@ function useLookups() {
         statuses: await statRes.json(),
       };
     },
-    staleTime: 5 * 60_000, // lookups rarely change, cache 5 min
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -57,6 +76,8 @@ export default function CreateTicketForm({ onClose, onCreated }) {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -68,9 +89,18 @@ export default function CreateTicketForm({ onClose, onCreated }) {
     },
   });
 
-  const [serverError, setServerError] = useState("");
+  const handleAiParsed = (parsed) => {
+    setValue("title", parsed.title);
+    setValue("description", parsed.description);
+    if (parsed.category) setValue("category", parsed.category);
+    if (parsed.priority) setValue("priority", parsed.priority);
+    if (parsed.managerId) setValue("managerId", String(parsed.managerId));
+  };
 
-  //  React Query mutation for the actual POST
+  const category = watch("category");
+  const priority = watch("priority");
+  const managerId = watch("managerId");
+
   const createTicket = useMutation({
     mutationFn: async (formValues) => {
       const categoryId = lookups.categories.find(
@@ -110,98 +140,30 @@ export default function CreateTicketForm({ onClose, onCreated }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      toast.success("Ticket created successfully.");
       onCreated();
       onClose();
     },
-    onError: (err) => setServerError(err.message),
+    onError: (err) => toast.error(err.message),
   });
 
-  const onSubmit = (values) => {
-    setServerError("");
-    createTicket.mutate(values);
-  };
-
-  const inputStyle = {
-    backgroundColor: "#f3f4f6",
-    border: "none",
-    borderRadius: "10px",
-    padding: "11px 14px",
-    width: "100%",
-    fontSize: "0.9rem",
-    outline: "none",
-  };
-  const errorTextStyle = {
-    fontSize: "0.78rem",
-    color: "#dc2626",
-    marginTop: "4px",
-  };
+  const onSubmit = (values) => createTicket.mutate(values);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1050,
-        overflowY: "auto",
-        padding: "24px",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: "16px",
-          padding: "32px",
-          width: "100%",
-          maxWidth: "560px",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h5 className="mb-0 fw-bold" style={{ fontSize: "1.25rem" }}>
-            Create New Ticket
-          </h5>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "1.4rem",
-              cursor: "pointer",
-              color: "#9ca3af",
-            }}
-          >
-            ×
-          </button>
-        </div>
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Create New Ticket</DialogTitle>
+        </DialogHeader>
 
-        {serverError && (
-          <div
-            className="alert alert-danger py-2 mb-3"
-            style={{ fontSize: "0.85rem" }}
-          >
-            {serverError}
-          </div>
-        )}
+        <VoiceTicketInput onParsed={handleAiParsed} managers={managers} />
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Title */}
-          <div className="mb-3">
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Title
-            </label>
-            <input
-              type="text"
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
               placeholder="Brief description of the issue"
-              style={inputStyle}
               {...register("title", {
                 required: "Title is required.",
                 maxLength: {
@@ -211,22 +173,16 @@ export default function CreateTicketForm({ onClose, onCreated }) {
               })}
             />
             {errors.title && (
-              <p style={errorTextStyle}>{errors.title.message}</p>
+              <p className="text-sm text-destructive">{errors.title.message}</p>
             )}
           </div>
 
-          {/* Description */}
-          <div className="mb-3">
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
-              Description
-            </label>
-            <textarea
+          <div className="space-y-1.5">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
               rows={3}
               placeholder="Provide detailed information about the issue"
-              style={{ ...inputStyle, resize: "vertical" }}
               {...register("description", {
                 required: "Description is required.",
                 minLength: {
@@ -236,94 +192,88 @@ export default function CreateTicketForm({ onClose, onCreated }) {
               })}
             />
             {errors.description && (
-              <p style={errorTextStyle}>{errors.description.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.description.message}
+              </p>
             )}
           </div>
 
-          {/* Category + Priority */}
-          <div className="d-flex gap-3 mb-3">
-            <div style={{ flex: 1 }}>
-              <label
-                className="form-label fw-semibold"
-                style={{ fontSize: "0.85rem" }}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select
+                value={category}
+                onValueChange={(v) => setValue("category", v)}
               >
-                Category
-              </label>
-              <select style={inputStyle} {...register("category")}>
-                {CATEGORIES.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div style={{ flex: 1 }}>
-              <label
-                className="form-label fw-semibold"
-                style={{ fontSize: "0.85rem" }}
+            <div className="space-y-1.5">
+              <Label>Priority</Label>
+              <Select
+                value={priority}
+                onValueChange={(v) => setValue("priority", v)}
               >
-                Priority
-              </label>
-              <select style={inputStyle} {...register("priority")}>
-                {PRIORITIES.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* Ticket Manager */}
-          <div className="mb-4">
-            <label
-              className="form-label fw-semibold"
-              style={{ fontSize: "0.85rem" }}
-            >
+          <div className="space-y-1.5">
+            <Label>
               Ticket Manager{" "}
-              <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+              <span className="text-muted-foreground font-normal">
                 (optional)
               </span>
-            </label>
-            <select style={inputStyle} {...register("managerId")}>
-              <option value="">— Select a manager —</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.userName}
-                </option>
-              ))}
-            </select>
+            </Label>
+            <Select
+              value={managerId}
+              onValueChange={(v) => setValue("managerId", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a manager" />
+              </SelectTrigger>
+              <SelectContent>
+                {managers.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>
+                    {m.userName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="d-flex justify-content-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "1px solid #d1d5db",
-                borderRadius: "8px",
-                padding: "8px 22px",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-            >
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={createTicket.isPending || lookupsLoading}
-              style={{
-                background: "#111",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 22px",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
             >
               {createTicket.isPending ? "Creating..." : "Create Ticket"}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

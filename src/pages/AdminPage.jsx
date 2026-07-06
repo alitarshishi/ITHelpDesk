@@ -1,6 +1,45 @@
-// AdminPage.jsx
-import ActivityLogModal from "../components/ActivityLogModal";
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import Header from "@/components/Header";
+
+import {
+  LayoutDashboard,
+  Ticket,
+  Users,
+  Plus,
+  RotateCw,
+  LogOut,
+  Activity,
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import StatusBadge from "@/components/StatusBadge";
+import PriorityBadge from "@/components/PriorityBadge";
+import RoleBadge from "@/components/RoleBadge";
+import DashboardOverview from "@/components/dashboard/DashboardOverview";
+import ActivityLogModal from "@/components/ActivityLogModal";
+import CreateUserForm from "@/components/forms/CreateUserForm";
+
+import { logout, getUser } from "@/services/authService";
 import {
   useAllTickets,
   useAllUsers,
@@ -8,95 +47,8 @@ import {
   useActivateUser,
   useDeleteUser,
   useChangeUserRole,
-} from "../hooks/useAdminData";
-import { useNavigate } from "react-router-dom";
-import { authFetch, logout, getUser } from "../services/authService";
-import DashboardOverview from "../components/dashboard/DashboardOverview";
-import CreateUserForm from "../components/forms/CreateUserForm";
+} from "@/hooks/useAdminData";
 
-const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
-
-// ── Role badge ─────────────────────────────────────────────
-const roleBadge = (role) => {
-  const map = {
-    Admin: { bg: "#fee2e2", color: "#b91c1c" },
-    Employee: { bg: "#dbeafe", color: "#1d4ed8" },
-    "IT Agent": { bg: "#d1fae5", color: "#065f46" },
-    ITAgent: { bg: "#d1fae5", color: "#065f46" },
-    Manager: { bg: "#fef9c3", color: "#854d0e" },
-  };
-  const s = map[role] || { bg: "#f3f4f6", color: "#374151" };
-  return (
-    <span
-      style={{
-        background: s.bg,
-        color: s.color,
-        borderRadius: "999px",
-        padding: "2px 12px",
-        fontSize: "0.75rem",
-        fontWeight: 600,
-      }}
-    >
-      {role || "—"}
-    </span>
-  );
-};
-
-// ── Priority badge ─────────────────────────────────────────
-const priorityBadge = (p) => {
-  const map = {
-    critical: { bg: "#7f1d1d", color: "#fff" },
-    high: { bg: "#f97316", color: "#fff" },
-    medium: { bg: "#f59e0b", color: "#fff" },
-    low: { bg: "#6b7280", color: "#fff" },
-  };
-  const key = (p || "").toLowerCase();
-  const s = map[key] || { bg: "#e5e7eb", color: "#374151" };
-  return (
-    <span
-      style={{
-        background: s.bg,
-        color: s.color,
-        borderRadius: "999px",
-        padding: "2px 12px",
-        fontSize: "0.75rem",
-        fontWeight: 600,
-      }}
-    >
-      {p || "—"}
-    </span>
-  );
-};
-
-// ── Status badge ───────────────────────────────────────────
-const statusBadge = (s) => {
-  const map = {
-    open: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
-    "in progress": { bg: "#fefce8", color: "#854d0e", border: "#fde68a" },
-    resolved: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-    closed: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
-  };
-  const key = (s || "").toLowerCase();
-  const st = map[key] || { bg: "#f3f4f6", color: "#374151", border: "#e5e7eb" };
-  return (
-    <span
-      style={{
-        background: st.bg,
-        color: st.color,
-        border: `1px solid ${st.border}`,
-        borderRadius: "999px",
-        padding: "2px 12px",
-        fontSize: "0.75rem",
-        fontWeight: 600,
-      }}
-    >
-      {s || "—"}
-    </span>
-  );
-};
-
-// ── Roles list ─────────────────────────────────────────────
 const ROLES = [
   { id: 1, name: "Admin" },
   { id: 2, name: "Employee" },
@@ -104,135 +56,14 @@ const ROLES = [
   { id: 4, name: "Manager" },
 ];
 
-// ── Change Role Modal ──────────────────────────────────────
-function ChangeRoleModal({ user, onClose, onChanged }) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleRoleChange = async (roleId) => {
-    setSaving(true);
-    setError("");
-    try {
-      const res = await authFetch(`${API_BASE_URL}/users/${user.id}/role`, {
-        method: "PUT",
-        body: JSON.stringify({ roleId }),
-      });
-      if (!res.ok) {
-        setError("Failed to change role.");
-        return;
-      }
-      onChanged();
-      onClose();
-    } catch {
-      setError("Could not reach the server.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1060,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: "16px",
-          padding: "32px",
-          width: "100%",
-          maxWidth: "400px",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h5 className="mb-0 fw-bold">Change Role</h5>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "1.4rem",
-              cursor: "pointer",
-              color: "#9ca3af",
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        <p
-          style={{
-            color: "#6b7280",
-            fontSize: "0.85rem",
-            marginBottom: "16px",
-          }}
-        >
-          Changing role for <strong>{user.userName}</strong>
-        </p>
-
-        {error && (
-          <div
-            className="alert alert-danger py-2 mb-3"
-            style={{ fontSize: "0.85rem" }}
-          >
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {ROLES.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => handleRoleChange(r.id)}
-              disabled={saving}
-              style={{
-                background: user.role === r.name ? "#111" : "#f3f4f6",
-                color: user.role === r.name ? "#fff" : "#374151",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 16px",
-                fontSize: "0.9rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                textAlign: "left",
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
-              <span>{r.name}</span>
-              {user.role === r.name && (
-                <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>
-                  current
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main AdminPage ─────────────────────────────────────────
 export default function AdminPage() {
   const navigate = useNavigate();
   const currentUser = getUser();
 
-  const [activeTab, setActiveTab] = useState("tickets");
-  const [showModal, setShowModal] = useState(false);
-  const [roleModal, setRoleModal] = useState(null); // user to change role
-  const [activityModal, setActivityModal] = useState(null); // ticket to view log
-  const [actionMsg, setActionMsg] = useState("");
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [activityModal, setActivityModal] = useState(null);
+
   const {
     data: tickets = [],
     isLoading: ticketLoad,
@@ -246,7 +77,7 @@ export default function AdminPage() {
     isLoading: userLoad,
     isError: userIsError,
     refetch: fetchUsers,
-  } = useAllUsers(activeTab === "users"); // only fetches once the Users tab is opened
+  } = useAllUsers(activeTab === "users");
   const userError = userIsError ? "Failed to load users." : "";
 
   const deactivateUser = useDeactivateUser();
@@ -254,10 +85,9 @@ export default function AdminPage() {
   const deleteUser = useDeleteUser();
   const changeUserRole = useChangeUserRole();
 
-  // ── User actions ──────────────────────────────────────
-  const showMsg = (msg) => {
-    setActionMsg(msg);
-    setTimeout(() => setActionMsg(""), 4000);
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
   };
 
   const handleDeactivate = (u) => {
@@ -268,15 +98,15 @@ export default function AdminPage() {
     )
       return;
     deactivateUser.mutate(u.id, {
-      onSuccess: () => showMsg(`${u.userName} has been deactivated.`),
-      onError: () => showMsg("Failed to deactivate user."),
+      onSuccess: () => toast.success(`${u.userName} has been deactivated.`),
+      onError: () => toast.error("Failed to deactivate user."),
     });
   };
 
   const handleActivate = (u) => {
     activateUser.mutate(u.id, {
-      onSuccess: () => showMsg(`${u.userName} has been activated.`),
-      onError: () => showMsg("Failed to activate user."),
+      onSuccess: () => toast.success(`${u.userName} has been activated.`),
+      onError: () => toast.error("Failed to activate user."),
     });
   };
 
@@ -288,585 +118,326 @@ export default function AdminPage() {
     )
       return;
     deleteUser.mutate(u.id, {
-      onSuccess: () => showMsg(`${u.userName} has been deleted.`),
-      onError: (err) => showMsg(err.message),
+      onSuccess: () => toast.success(`${u.userName} has been deleted.`),
+      onError: (err) => toast.error(err.message),
     });
   };
 
-  const handleRoleChange = (userId, roleId) => {
+  const handleRoleChange = (userId, roleId, userName) => {
     changeUserRole.mutate(
       { userId, roleId },
       {
-        onSuccess: () => showMsg("Role updated."),
-        onError: () => showMsg("Failed to change role."),
+        onSuccess: () => toast.success(`Role updated for ${userName}.`),
+        onError: () => toast.error("Failed to change role."),
       },
     );
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
-
-  // ── Styles ────────────────────────────────────────────
-  const thStyle = {
-    padding: "12px 16px",
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    color: "#6b7280",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    background: "#f9fafb",
-    borderBottom: "1px solid #e5e7eb",
-    whiteSpace: "nowrap",
-  };
-  const tdStyle = {
-    padding: "13px 16px",
-    fontSize: "0.85rem",
-    color: "#374151",
-    borderBottom: "1px solid #f3f4f6",
-    whiteSpace: "nowrap",
-  };
-  const actionBtn = (bg, color, label, onClick, disabled = false) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        background: bg,
-        color,
-        border: "none",
-        borderRadius: "6px",
-        padding: "4px 10px",
-        fontSize: "0.75rem",
-        fontWeight: 600,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.5 : 1,
-      }}
-    >
-      {label}
-    </button>
-  );
-
-  const sidebarLink = (tab) => ({
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px 16px",
-    borderRadius: "10px",
-    cursor: "pointer",
-    fontWeight: activeTab === tab ? 600 : 400,
-    background: activeTab === tab ? "#111" : "transparent",
-    color: activeTab === tab ? "#fff" : "#374151",
-    fontSize: "0.9rem",
-    border: "none",
-    width: "100%",
-    textAlign: "left",
-    transition: "all 0.15s",
-  });
+  const navItems = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { key: "tickets", label: "All Tickets", icon: Ticket },
+    { key: "users", label: "All Users", icon: Users },
+  ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
-        background: "#f8fafc",
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-    >
+    <div className="flex min-h-screen flex-col bg-muted/30 font-sans">
       {/* ── Navbar ── */}
-      <nav
-        style={{
-          background: "#fff",
-          borderBottom: "1px solid #e5e7eb",
-          padding: "0 32px",
-          height: "60px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <span
-          style={{
-            fontWeight: 700,
-            fontSize: "1.1rem",
-            letterSpacing: "-0.5px",
-          }}
-        >
-          🖥️ IT Help Desk
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-            {currentUser?.userName || "Admin"}
-          </span>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              background: "#111",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "7px 16px",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            + Create User
-          </button>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: "none",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              padding: "7px 16px",
-              fontSize: "0.85rem",
-              cursor: "pointer",
-              color: "#374151",
-            }}
-          >
-            Log Out
-          </button>
-        </div>
-      </nav>
+      <Header
+        actions={
+          <Button size="sm" onClick={() => setShowCreateUser(true)}>
+            <Plus className="mr-1 h-4 w-4" />
+            Create User
+          </Button>
+        }
+      />
 
-      <div style={{ display: "flex", flex: 1 }}>
+      <div className="flex flex-1">
         {/* ── Sidebar ── */}
-        <aside
-          style={{
-            width: "220px",
-            minHeight: "calc(100vh - 60px)",
-            background: "#fff",
-            borderRight: "1px solid #e5e7eb",
-            padding: "24px 12px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-            position: "sticky",
-            top: "60px",
-            alignSelf: "flex-start",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              color: "#9ca3af",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              padding: "0 16px",
-              marginBottom: "8px",
-            }}
-          >
+        <aside className="sticky top-15 flex h-[calc(100vh-60px)] w-56 flex-col gap-1 self-start border-r bg-background p-3">
+          <p className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Navigation
           </p>
-          <button
-            style={sidebarLink("dashboard")}
-            onClick={() => setActiveTab("dashboard")}
-          >
-            📊 Dashboard
-          </button>
-          <button
-            style={sidebarLink("tickets")}
-            onClick={() => setActiveTab("tickets")}
-          >
-            🎫 All Tickets
-          </button>
-          <button
-            style={sidebarLink("users")}
-            onClick={() => setActiveTab("users")}
-          >
-            👥 All Users
-          </button>
+          {navItems.map((item) => (
+            <Button
+              key={item.key}
+              variant={activeTab === item.key ? "default" : "ghost"}
+              className="justify-start gap-2"
+              onClick={() => setActiveTab(item.key)}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Button>
+          ))}
         </aside>
 
         {/* ── Main content ── */}
-        <main style={{ flex: 1, padding: "32px", overflow: "auto" }}>
+        <main className="flex-1 overflow-auto p-8">
           {activeTab === "dashboard" && <DashboardOverview />}
-          {/* ════ TICKETS VIEW ════ */}
+
+          {/* ════ TICKETS ════ */}
           {activeTab === "tickets" && (
             <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "24px",
-                }}
-              >
+              <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h4
-                    style={{ margin: 0, fontWeight: 700, fontSize: "1.3rem" }}
-                  >
+                  <h1 className="text-2xl font-bold tracking-tight">
                     All Tickets
-                  </h4>
-                  <p
-                    style={{ margin: 0, color: "#6b7280", fontSize: "0.85rem" }}
-                  >
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
                     {tickets.length} ticket{tickets.length !== 1 ? "s" : ""}{" "}
                     total
                   </p>
                 </div>
-                <button
-                  onClick={fetchTickets}
-                  style={{
-                    background: "none",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    padding: "7px 16px",
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    color: "#374151",
-                  }}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchTickets()}
                 >
-                  ↻ Refresh
-                </button>
+                  <RotateCw className="mr-1 h-4 w-4" />
+                  Refresh
+                </Button>
               </div>
 
               {ticketLoad && (
-                <p style={{ color: "#6b7280" }}>Loading tickets...</p>
+                <p className="text-muted-foreground">Loading tickets...</p>
               )}
               {ticketError && (
-                <div className="alert alert-danger">{ticketError}</div>
+                <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  {ticketError}
+                </p>
               )}
 
               {!ticketLoad && !ticketError && (
-                <div
-                  style={{
-                    background: "#fff",
-                    borderRadius: "12px",
-                    border: "1px solid #e5e7eb",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ overflowX: "auto" }}>
-                    <table
-                      style={{ width: "100%", borderCollapse: "collapse" }}
-                    >
-                      <thead>
-                        <tr>
-                          {[
-                            "Ticket ID",
-                            "Title",
-                            "Status",
-                            "Priority",
-                            "Category",
-                            "Assigned To",
-                            "Submitted By",
-                            "Created",
-                            "",
-                          ].map((h) => (
-                            <th key={h} style={thStyle}>
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {tickets.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={9}
-                              style={{
-                                ...tdStyle,
-                                textAlign: "center",
-                                color: "#9ca3af",
-                                padding: "40px",
-                              }}
-                            >
-                              No tickets found
-                            </td>
-                          </tr>
-                        ) : (
-                          tickets.map((t) => (
-                            <tr
-                              key={t.id}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = "#fafafa")
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background =
-                                  "transparent")
-                              }
-                            >
-                              <td
-                                style={{
-                                  ...tdStyle,
-                                  fontWeight: 600,
-                                  color: "#111",
-                                  fontFamily: "monospace",
-                                }}
+                <Card className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ticket ID</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Assigned To</TableHead>
+                        <TableHead>Submitted By</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tickets.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={9}
+                            className="py-12 text-center text-muted-foreground"
+                          >
+                            No tickets found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        tickets.map((t) => (
+                          <TableRow key={t.id}>
+                            <TableCell className="font-mono font-semibold">
+                              TKT-{String(t.id).padStart(4, "0")}
+                            </TableCell>
+                            <TableCell className="max-w-[220px] truncate">
+                              {t.title}
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={t.statusName} />
+                            </TableCell>
+                            <TableCell>
+                              <PriorityBadge priority={t.priorityName} />
+                            </TableCell>
+                            <TableCell>{t.categoryName || "—"}</TableCell>
+                            <TableCell>
+                              {t.assignedToName || (
+                                <span className="text-muted-foreground">
+                                  Unassigned
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>{t.submittedByName || "—"}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {t.dateCreated
+                                ? new Date(t.dateCreated).toLocaleDateString()
+                                : "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setActivityModal(t)}
                               >
-                                TKT-{String(t.id).padStart(4, "0")}
-                              </td>
-                              <td
-                                style={{
-                                  ...tdStyle,
-                                  maxWidth: "220px",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {t.title}
-                              </td>
-                              <td style={tdStyle}>
-                                {statusBadge(t.statusName)}
-                              </td>
-                              <td style={tdStyle}>
-                                {priorityBadge(t.priorityName)}
-                              </td>
-                              <td style={tdStyle}>{t.categoryName || "—"}</td>
-                              <td style={tdStyle}>
-                                {t.assignedToName || (
-                                  <span style={{ color: "#9ca3af" }}>
-                                    Unassigned
-                                  </span>
-                                )}
-                              </td>
-                              <td style={tdStyle}>
-                                {t.submittedByName || "—"}
-                              </td>
-                              <td style={{ ...tdStyle, color: "#9ca3af" }}>
-                                {t.dateCreated
-                                  ? new Date(t.dateCreated).toLocaleDateString()
-                                  : "—"}
-                              </td>
-                              {/* 👇 action buttons */}
-                              <td style={tdStyle}>
-                                <div style={{ display: "flex", gap: "6px" }}>
-                                  {actionBtn(
-                                    "#eff6ff",
-                                    "#1d4ed8",
-                                    "Activity",
-                                    () => setActivityModal(t),
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                                <Activity className="mr-1 h-3.5 w-3.5" />
+                                Activity
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </Card>
               )}
             </>
           )}
 
-          {/* ════ USERS VIEW ════ */}
+          {/* ════ USERS ════ */}
           {activeTab === "users" && (
             <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "24px",
-                }}
-              >
+              <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h4
-                    style={{ margin: 0, fontWeight: 700, fontSize: "1.3rem" }}
-                  >
+                  <h1 className="text-2xl font-bold tracking-tight">
                     All Users
-                  </h4>
-                  <p
-                    style={{ margin: 0, color: "#6b7280", fontSize: "0.85rem" }}
-                  >
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
                     {users.length} user{users.length !== 1 ? "s" : ""} total
                   </p>
                 </div>
-                <button
-                  onClick={fetchUsers}
-                  style={{
-                    background: "none",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    padding: "7px 16px",
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    color: "#374151",
-                  }}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchUsers()}
                 >
-                  ↻ Refresh
-                </button>
+                  <RotateCw className="mr-1 h-4 w-4" />
+                  Refresh
+                </Button>
               </div>
 
-              {/* Action message toast */}
-              {actionMsg && (
-                <div
-                  className="alert alert-success py-2 mb-3"
-                  style={{ fontSize: "0.85rem", cursor: "pointer" }}
-                  onClick={() => setActionMsg("")}
-                >
-                  {actionMsg} <span style={{ float: "right" }}>×</span>
-                </div>
+              {userLoad && (
+                <p className="text-muted-foreground">Loading users...</p>
               )}
-
-              {userLoad && <p style={{ color: "#6b7280" }}>Loading users...</p>}
               {userError && (
-                <div className="alert alert-danger">{userError}</div>
+                <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  {userError}
+                </p>
               )}
 
               {!userLoad && !userError && (
-                <div
-                  style={{
-                    background: "#fff",
-                    borderRadius: "12px",
-                    border: "1px solid #e5e7eb",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ overflowX: "auto" }}>
-                    <table
-                      style={{ width: "100%", borderCollapse: "collapse" }}
-                    >
-                      <thead>
-                        <tr>
-                          {[
-                            "ID",
-                            "Username",
-                            "Email",
-                            "Role",
-                            "Status",
-                            "Created By",
-                            "Created Date",
-                            "Updated By",
-                            "Updated Date",
-                            "Actions",
-                          ].map((h) => (
-                            <th key={h} style={thStyle}>
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={10}
-                              style={{
-                                ...tdStyle,
-                                textAlign: "center",
-                                color: "#9ca3af",
-                                padding: "40px",
-                              }}
-                            >
-                              No users found
-                            </td>
-                          </tr>
-                        ) : (
-                          users.map((u) => (
-                            <tr
-                              key={u.id}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = "#fafafa")
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background =
-                                  "transparent")
-                              }
-                            >
-                              <td
-                                style={{
-                                  ...tdStyle,
-                                  fontWeight: 600,
-                                  color: "#111",
-                                }}
+                <Card className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Username</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created By</TableHead>
+                        <TableHead>Created Date</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={8}
+                            className="py-12 text-center text-muted-foreground"
+                          >
+                            No users found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        users.map((u) => (
+                          <TableRow key={u.id}>
+                            <TableCell className="font-semibold">
+                              {u.id}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {u.userName}
+                              {!u.isActive && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-2 bg-red-50 text-red-700"
+                                >
+                                  Inactive
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>{u.email}</TableCell>
+                            <TableCell>
+                              <RoleBadge role={u.role} />
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={
+                                  u.isActive
+                                    ? "text-green-700"
+                                    : "text-muted-foreground"
+                                }
                               >
-                                {u.id}
-                              </td>
-                              <td style={{ ...tdStyle, fontWeight: 500 }}>
-                                {u.userName}
-                                {!u.isActive && (
-                                  <span
-                                    style={{
-                                      marginLeft: "8px",
-                                      fontSize: "0.7rem",
-                                      background: "#fee2e2",
-                                      color: "#b91c1c",
-                                      borderRadius: "999px",
-                                      padding: "1px 8px",
-                                    }}
+                                {u.isActive ? "● Active" : "○ Inactive"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {u.createdBy || "—"}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {u.createdDate
+                                ? new Date(u.createdDate).toLocaleDateString()
+                                : "—"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1.5">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                      Role
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {ROLES.map((r) => (
+                                      <DropdownMenuItem
+                                        key={r.id}
+                                        onClick={() =>
+                                          handleRoleChange(
+                                            u.id,
+                                            r.id,
+                                            u.userName,
+                                          )
+                                        }
+                                      >
+                                        {r.name} {u.role === r.name && "✓"}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                {u.isActive ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-24"
+                                    onClick={() => handleDeactivate(u)}
                                   >
-                                    Inactive
-                                  </span>
+                                    Deactivate
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-24"
+                                    onClick={() => handleActivate(u)}
+                                  >
+                                    Activate
+                                  </Button>
                                 )}
-                              </td>
-                              <td style={tdStyle}>{u.email}</td>
-                              <td style={tdStyle}>{roleBadge(u.role)}</td>
-                              <td style={tdStyle}>
-                                <span
-                                  style={{
-                                    fontSize: "0.75rem",
-                                    fontWeight: 600,
-                                    color: u.isActive ? "#166534" : "#9ca3af",
-                                  }}
+
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDelete(u)}
                                 >
-                                  {u.isActive ? "● Active" : "○ Inactive"}
-                                </span>
-                              </td>
-                              <td style={{ ...tdStyle, color: "#6b7280" }}>
-                                {u.createdBy || "—"}
-                              </td>
-                              <td style={{ ...tdStyle, color: "#6b7280" }}>
-                                {u.createdDate
-                                  ? new Date(u.createdDate).toLocaleDateString()
-                                  : "—"}
-                              </td>
-                              <td style={{ ...tdStyle, color: "#6b7280" }}>
-                                {u.updatedBy || "—"}
-                              </td>
-                              <td style={{ ...tdStyle, color: "#6b7280" }}>
-                                {u.updatedDate
-                                  ? new Date(u.updatedDate).toLocaleDateString()
-                                  : "—"}
-                              </td>
-                              {/* 👇 action buttons */}
-                              <td style={tdStyle}>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "6px",
-                                    flexWrap: "wrap",
-                                  }}
-                                >
-                                  {actionBtn("#eff6ff", "#1d4ed8", "Role", () =>
-                                    setRoleModal(u),
-                                  )}
-                                  {u.isActive
-                                    ? actionBtn(
-                                        "#fef9c3",
-                                        "#854d0e",
-                                        "Deactivate",
-                                        () => handleDeactivate(u),
-                                      )
-                                    : actionBtn(
-                                        "#d1fae5",
-                                        "#065f46",
-                                        "Activate",
-                                        () => handleActivate(u),
-                                      )}
-                                  {actionBtn(
-                                    "#fee2e2",
-                                    "#b91c1c",
-                                    "Delete",
-                                    () => handleDelete(u),
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                                  Delete
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </Card>
               )}
             </>
           )}
@@ -874,23 +445,11 @@ export default function AdminPage() {
       </div>
 
       {/* ── Create User Modal ── */}
-      {showModal && (
+      {showCreateUser && (
         <CreateUserForm
-          onClose={() => setShowModal(false)}
+          onClose={() => setShowCreateUser(false)}
           onCreated={() => {
             if (activeTab === "users") fetchUsers();
-          }}
-        />
-      )}
-
-      {/* ── Change Role Modal ── */}
-      {roleModal && (
-        <ChangeRoleModal
-          user={roleModal}
-          onClose={() => setRoleModal(null)}
-          onChanged={() => {
-            fetchUsers();
-            showMsg(`Role updated for ${roleModal.userName}.`);
           }}
         />
       )}

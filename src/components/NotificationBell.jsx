@@ -1,16 +1,27 @@
-import React, { useState, useEffect, useRef } from "react";
-import { authFetch } from "../services/authService";
-import { startConnection, stopConnection } from "../services/notificationHub";
+import React, { useState, useEffect } from "react";
+import { Bell, Trash2 } from "lucide-react";
+import { authFetch } from "@/services/authService";
+import { startConnection, stopConnection } from "@/services/notificationHub";
+
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
 
-export default function NotificationBell() {
+// Triggers that should open the Activity Log instead of ticket Details
+const ACTIVITY_LOG_TRIGGERS = ["Reassigned"];
+
+export default function NotificationBell({ onOpenTicket }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const dropdownRef = useRef();
 
   const fetchUnreadCount = async () => {
     try {
@@ -26,51 +37,90 @@ export default function NotificationBell() {
     try {
       const res = await authFetch(`${API_BASE_URL}/notifications`);
       if (!res.ok) return;
-      const data = await res.json();
-      setNotifications(data);
+      setNotifications(await res.json());
     } catch {
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Initial load + live SignalR connection ──
+  useEffect(() => {
+    const handleReconnect = () => {
+      // Re-fetch from REST in case we missed pushes during disconnect
+      fetchUnreadCount();
+      if (open) fetchNotifications();
+    };
+
+    window.addEventListener("signalr-reconnected", handleReconnect);
+    return () =>
+      window.removeEventListener("signalr-reconnected", handleReconnect);
+  }, [open]);
+
   useEffect(() => {
     fetchUnreadCount();
 
-    startConnection((notification) => {
-      // 👇 fires INSTANTLY when the backend pushes a new notification
-      setNotifications((prev) => [notification, ...prev]);
-      setUnreadCount((c) => c + 1);
-    });
-
-    return () => stopConnection();
-  }, []);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
-        setOpen(false);
+    const channel = new BroadcastChannel("notification-sync");
+    channel.onmessage = (e) => {
+      if (e.data.type === "unread-count") {
+        setUnreadCount(e.data.count);
+      }
+      if (e.data.type === "new-notification") {
+        setNotifications((prev) => {
+          // avoid duplicates if this tab also received it via SignalR
+          if (prev.some((n) => n.id === e.data.notification.id)) return prev;
+          return [e.data.notification, ...prev];
+        });
+        setUnreadCount((c) => c + 1);
+      }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    startConnection((notification) => {
+      setNotifications((prev) => [notification, ...prev]);
+      setUnreadCount((c) => {
+        const next = c + 1;
+        //  broadcast to other tabs
+        channel.postMessage({ type: "unread-count", count: next });
+        return next;
+      });
+      // also broadcast the full notification object
+      channel.postMessage({ type: "new-notification", notification });
+    });
+    return () => {
+      stopConnection();
+      channel.close();
+    };
   }, []);
 
-  const handleToggle = () => {
-    const next = !open;
+  const handleOpenChange = (next) => {
     setOpen(next);
     if (next) fetchNotifications();
   };
 
-  const handleMarkAllRead = async () => {
+  const handleMarkAllRead = async (e) => {
+    e.stopPropagation();
     await authFetch(`${API_BASE_URL}/notifications/read-all`, {
       method: "PUT",
     });
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
+
+    const channel = new BroadcastChannel("notification-sync");
+    channel.postMessage({ type: "unread-count", count: 0 });
+    channel.close();
+  };
+
+  const handleClearAll = async (e) => {
+    e.stopPropagation();
+    if (!window.confirm("Clear all notifications? This cannot be undone."))
+      return;
+    await authFetch(`${API_BASE_URL}/notifications/clear-all`, {
+      method: "DELETE",
+    });
+    setNotifications([]);
+    setUnreadCount(0);
   };
 
   const handleNotificationClick = async (n) => {
+    // mark read
     if (!n.isRead) {
       await authFetch(`${API_BASE_URL}/notifications/${n.id}/read`, {
         method: "PUT",
@@ -81,6 +131,20 @@ export default function NotificationBell() {
       setUnreadCount((c) => Math.max(0, c - 1));
     }
     setOpen(false);
+
+    // navigate to the right view
+    if (!n.ticketId) return;
+
+    try {
+      const res = await authFetch(`${API_BASE_URL}/tickets/${n.ticketId}`);
+      if (!res.ok) return;
+      const ticket = await res.json();
+
+      const view = ACTIVITY_LOG_TRIGGERS.includes(n.trigger)
+        ? "activity"
+        : "details";
+      onOpenTicket?.(ticket, view);
+    } catch {}
   };
 
   const timeAgo = (dateStr) => {
@@ -92,111 +156,48 @@ export default function NotificationBell() {
   };
 
   return (
-    <div ref={dropdownRef} style={{ position: "relative" }}>
-      <button
-        onClick={handleToggle}
-        style={{
-          background: "none",
-          border: "1px solid #e5e7eb",
-          borderRadius: "8px",
-          padding: "7px 12px",
-          cursor: "pointer",
-          position: "relative",
-          fontSize: "1rem",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        🔔
-        {unreadCount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: "-4px",
-              right: "-4px",
-              background: "#ef4444",
-              color: "#fff",
-              borderRadius: "999px",
-              fontSize: "0.65rem",
-              fontWeight: 700,
-              padding: "1px 5px",
-              minWidth: "16px",
-              lineHeight: "14px",
-              textAlign: "center",
-            }}
-          >
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: 0,
-            width: "340px",
-            maxHeight: "420px",
-            overflowY: "auto",
-            background: "#fff",
-            borderRadius: "12px",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            zIndex: 1100,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "14px 16px",
-              borderBottom: "1px solid #f3f4f6",
-            }}
-          >
-            <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>
-              Notifications
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="relative">
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+              {unreadCount > 9 ? "9+" : unreadCount}
             </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent align="end" className="w-[340px] p-0">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <span className="text-sm font-semibold">Notifications</span>
+          <div className="flex items-center gap-3">
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#1d4ed8",
-                  fontSize: "0.78rem",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                }}
+                className="text-xs font-semibold text-blue-700 hover:underline"
               >
                 Mark all read
               </button>
             )}
+            {notifications.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="flex items-center gap-1 text-xs font-semibold text-destructive hover:underline"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear all
+              </button>
+            )}
           </div>
+        </div>
 
+        <ScrollArea className="max-h-[400px]">
           {loading && (
-            <p
-              style={{
-                padding: "20px",
-                color: "#9ca3af",
-                fontSize: "0.85rem",
-                margin: 0,
-              }}
-            >
-              Loading...
-            </p>
+            <p className="p-5 text-sm text-muted-foreground">Loading...</p>
           )}
           {!loading && notifications.length === 0 && (
-            <p
-              style={{
-                padding: "24px",
-                color: "#9ca3af",
-                fontSize: "0.85rem",
-                margin: 0,
-                textAlign: "center",
-              }}
-            >
+            <p className="p-6 text-center text-sm text-muted-foreground">
               No notifications yet.
             </p>
           )}
@@ -206,62 +207,23 @@ export default function NotificationBell() {
               <div
                 key={n.id}
                 onClick={() => handleNotificationClick(n)}
-                style={{
-                  padding: "12px 16px",
-                  cursor: "pointer",
-                  borderBottom: "1px solid #f9fafb",
-                  background: n.isRead ? "#fff" : "#eff6ff",
-                  display: "flex",
-                  gap: "10px",
-                  alignItems: "flex-start",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = n.isRead
-                    ? "#fafafa"
-                    : "#dbeafe")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = n.isRead
-                    ? "#fff"
-                    : "#eff6ff")
-                }
+                className={`flex cursor-pointer gap-2.5 border-b px-4 py-3 last:border-b-0 hover:bg-muted ${
+                  n.isRead ? "" : "bg-blue-50"
+                }`}
               >
                 {!n.isRead && (
-                  <span
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: "#3b82f6",
-                      marginTop: "5px",
-                      flexShrink: 0,
-                    }}
-                  />
+                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-600" />
                 )}
                 <div>
-                  <div
-                    style={{
-                      fontSize: "0.83rem",
-                      color: "#374151",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {n.message}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "0.72rem",
-                      color: "#9ca3af",
-                      marginTop: "2px",
-                    }}
-                  >
+                  <div className="text-sm leading-snug">{n.message}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
                     {timeAgo(n.createdAt)}
                   </div>
                 </div>
               </div>
             ))}
-        </div>
-      )}
-    </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
   );
 }

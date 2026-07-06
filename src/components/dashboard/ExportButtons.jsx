@@ -1,6 +1,9 @@
 import React, { useState } from "react";
-import { exportElementAsPdf } from "../../utils/exportDashboardPdf";
-import { getToken } from "../../services/authService";
+import { FileText, FileSpreadsheet } from "lucide-react";
+import { exportElementAsPdf } from "@/utils/exportDashboardPdf";
+import { getToken } from "@/services/authService";
+
+import { Button } from "@/components/ui/button";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
@@ -55,49 +58,29 @@ export default function ExportButtons({ dashboardRef, period }) {
     }
   };
 
-  const btnStyle = (loading) => ({
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: "8px",
-    padding: "7px 14px",
-    fontSize: "0.82rem",
-    fontWeight: 600,
-    color: "#374151",
-    cursor: loading ? "not-allowed" : "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    opacity: loading ? 0.6 : 1,
-  });
-
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-end",
-        gap: "6px",
-      }}
-    >
-      <div style={{ display: "flex", gap: "8px" }}>
-        <button
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleExportPdf}
           disabled={exportingPdf}
-          style={btnStyle(exportingPdf)}
         >
-          📄 {exportingPdf ? "Exporting..." : "Export PDF"}
-        </button>
-        <button
+          <FileText className="mr-1.5 h-4 w-4" />
+          {exportingPdf ? "Exporting..." : "Export PDF"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleExportExcel}
           disabled={exportingExcel}
-          style={btnStyle(exportingExcel)}
         >
-          📊 {exportingExcel ? "Exporting..." : "Export Excel"}
-        </button>
+          <FileSpreadsheet className="mr-1.5 h-4 w-4" />
+          {exportingExcel ? "Exporting..." : "Export Excel"}
+        </Button>
       </div>
-      {error && (
-        <span style={{ fontSize: "0.75rem", color: "#dc2626" }}>{error}</span>
-      )}
+      {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   );
 }

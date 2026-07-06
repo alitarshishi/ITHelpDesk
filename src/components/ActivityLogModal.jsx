@@ -1,8 +1,40 @@
 import React, { useState, useEffect } from "react";
-import { authFetch } from "../services/authService";
+import {
+  Ticket,
+  MessageSquare,
+  UserPlus,
+  Repeat,
+  RefreshCw,
+  CheckCircle2,
+  Lock,
+  Paperclip,
+  NotebookPen,
+  AlertTriangle,
+} from "lucide-react";
+import { authFetch } from "@/services/authService";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "https://localhost:7270/api";
+
+const eventIcons = {
+  Created: Ticket,
+  Comment: MessageSquare,
+  Assigned: UserPlus,
+  Reassigned: Repeat,
+  StatusChanged: RefreshCw,
+  Resolved: CheckCircle2,
+  Closed: Lock,
+  Escalated: AlertTriangle,
+  Attachment: Paperclip,
+  AgentNote: NotebookPen,
+};
 
 export default function ActivityLogModal({ ticket, onClose }) {
   const [logs, setLogs] = useState([]);
@@ -16,8 +48,7 @@ export default function ActivityLogModal({ ticket, onClose }) {
           `${API_BASE_URL}/tickets/${ticket.id}/activity`,
         );
         if (!res.ok) return;
-        const data = await res.json();
-        setLogs(data);
+        setLogs(await res.json());
       } catch {
       } finally {
         setLoading(false);
@@ -26,167 +57,52 @@ export default function ActivityLogModal({ ticket, onClose }) {
     load();
   }, [ticket.id]);
 
-  const eventIcon = (type) =>
-    ({
-      Created: "🎫",
-      Comment: "💬",
-      Reassigned: "👤",
-      StatusChanged: "🔄",
-      Closed: "✅",
-      AgentNote: "📝",
-    })[type] || "📋";
-
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1050,
-        padding: "24px",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: "16px",
-          width: "100%",
-          maxWidth: "560px",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-          maxHeight: "80vh",
-          overflowY: "auto",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ padding: "28px 28px 0" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              marginBottom: "12px",
-            }}
-          >
-            <div>
-              <span
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "0.82rem",
-                  color: "#9ca3af",
-                }}
-              >
-                TKT-{String(ticket.id).padStart(4, "0")}
-              </span>
-              <h5
-                style={{
-                  margin: "4px 0 0",
-                  fontWeight: 700,
-                  fontSize: "1.1rem",
-                }}
-              >
-                Activity Log
-              </h5>
-            </div>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "1.4rem",
-                cursor: "pointer",
-                color: "#9ca3af",
-              }}
-            >
-              ×
-            </button>
-          </div>
-          <hr style={{ borderColor: "#f3f4f6", margin: "0 0 20px" }} />
-        </div>
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <span className="font-mono text-xs text-muted-foreground">
+            TKT-{String(ticket.id).padStart(4, "0")}
+          </span>
+          <DialogTitle>Activity Log</DialogTitle>
+        </DialogHeader>
 
-        <div style={{ padding: "0 28px 28px" }}>
-          {loading && <p style={{ color: "#9ca3af" }}>Loading activity...</p>}
-          {!loading && logs.length === 0 && (
-            <p style={{ color: "#9ca3af", fontSize: "0.85rem" }}>
-              No activity recorded yet.
-            </p>
+        {loading && (
+          <p className="text-sm text-muted-foreground">Loading activity...</p>
+        )}
+        {!loading && logs.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No activity recorded yet.
+          </p>
+        )}
+
+        <div className="relative">
+          {logs.length > 0 && (
+            <div className="absolute left-4 top-2 bottom-2 w-px bg-border" />
           )}
-          <div style={{ position: "relative" }}>
-            {logs.length > 0 && (
-              <div
-                style={{
-                  position: "absolute",
-                  left: "15px",
-                  top: "8px",
-                  bottom: "8px",
-                  width: "2px",
-                  background: "#e5e7eb",
-                }}
-              />
-            )}
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-            >
-              {logs.map((log) => (
-                <div
-                  key={log.id}
-                  style={{
-                    display: "flex",
-                    gap: "16px",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      background: "#f3f4f6",
-                      border: "2px solid #e5e7eb",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.85rem",
-                      flexShrink: 0,
-                      zIndex: 1,
-                    }}
-                  >
-                    {eventIcon(log.eventType)}
+          <div className="flex flex-col gap-4">
+            {logs.map((log) => {
+              const Icon = eventIcons[log.eventType] || Ticket;
+              return (
+                <div key={log.id} className="flex gap-4">
+                  <div className="z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border bg-muted">
+                    <Icon className="h-3.5 w-3.5" />
                   </div>
-                  <div style={{ paddingTop: "4px" }}>
-                    <div
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "#374151",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {log.action}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.75rem",
-                        color: "#9ca3af",
-                        marginTop: "2px",
-                      }}
-                    >
+                  <div className="pt-1">
+                    <div className="text-sm font-medium">{log.action}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
                       {log.userName && (
-                        <span style={{ marginRight: "8px" }}>
-                          👤 {log.userName}
-                        </span>
+                        <span className="mr-2">👤 {log.userName}</span>
                       )}
                       {new Date(log.timestamp).toLocaleString()}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

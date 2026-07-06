@@ -1,55 +1,46 @@
 import React from "react";
+import { Pie, PieChart, Cell } from "recharts";
+import { Card } from "@/components/ui/card";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 
-const COLORS = {
-  Open: "#1d4ed8",
-  "In Progress": "#d97706",
-  Resolved: "#16a34a",
-  Closed: "#6b7280",
-  Escalated: "#dc2626",
+const chartConfig = {
+  Open: { label: "Open", color: "hsl(217 91% 60%)" },
+  "In Progress": { label: "In Progress", color: "hsl(38 92% 50%)" },
+  Resolved: { label: "Resolved", color: "hsl(142 71% 45%)" },
+  Closed: { label: "Closed", color: "hsl(220 9% 46%)" },
+  Escalated: { label: "Escalated", color: "hsl(0 72% 51%)" },
 };
 
 export default function StatusPieChart({ data }) {
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "12px",
-        border: "1px solid #e5e7eb",
-        padding: "20px 24px",
-      }}
-    >
-      <h6
-        style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "16px" }}
-      >
-        Status Breakdown
-      </h6>
-      <ResponsiveContainer width="100%" height={260}>
+    <Card className="p-5">
+      <h3 className="mb-4 text-sm font-semibold">Status Breakdown</h3>
+      <ChartContainer config={chartConfig} className="h-[260px] w-full">
         <PieChart>
+          <ChartTooltip content={<ChartTooltipContent nameKey="status" />} />
           <Pie
             data={data}
             dataKey="count"
             nameKey="status"
-            cx="50%"
-            cy="50%"
             outerRadius={90}
             label
           >
             {data.map((entry, i) => (
-              <Cell key={i} fill={COLORS[entry.status] || "#9ca3af"} />
+              <Cell
+                key={i}
+                fill={chartConfig[entry.status]?.color || "hsl(220 9% 70%)"}
+              />
             ))}
           </Pie>
-          <Tooltip />
-          <Legend />
+          <ChartLegend content={<ChartLegendContent nameKey="status" />} />
         </PieChart>
-      </ResponsiveContainer>
-    </div>
+      </ChartContainer>
+    </Card>
   );
 }

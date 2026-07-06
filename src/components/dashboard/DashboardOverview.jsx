@@ -1,5 +1,14 @@
 import React, { useState, useRef } from "react";
-import { useDashboardStats } from "../../hooks/useDashboardStats";
+import {
+  Ticket,
+  Circle,
+  Clock,
+  CheckCircle2,
+  Lock,
+  AlertTriangle,
+} from "lucide-react";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
+
 import PeriodSelector from "./PeriodSelector";
 import StatCard from "./StatCard";
 import TicketsOverTimeChart from "./TicketsOverTimeChart";
@@ -15,97 +24,79 @@ export default function DashboardOverview() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "24px",
-        }}
-      >
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h4 style={{ margin: 0, fontWeight: 700, fontSize: "1.3rem" }}>
-            Dashboard
-          </h4>
-          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.85rem" }}>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
             Ticket statistics overview
           </p>
         </div>
-        <PeriodSelector value={period} onChange={setPeriod} />
-        <ExportButtons dashboardRef={dashboardRef} period={period} />
+        <div className="flex flex-col items-end gap-2.5">
+          <PeriodSelector value={period} onChange={setPeriod} />
+          <ExportButtons dashboardRef={dashboardRef} period={period} />
+        </div>
       </div>
 
-      {isLoading && <p style={{ color: "#6b7280" }}>Loading dashboard...</p>}
+      {isLoading && (
+        <p className="text-muted-foreground">Loading dashboard...</p>
+      )}
       {isError && (
-        <div className="alert alert-danger">
+        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
           Failed to load dashboard stats.
-        </div>
+        </p>
       )}
 
       {data && (
         <div ref={dashboardRef}>
-          <div
-            style={{
-              display: "flex",
-              gap: "16px",
-              flexWrap: "wrap",
-              marginBottom: "24px",
-            }}
-          >
+          <div className="mb-6 flex flex-wrap gap-4">
             <StatCard
               label="Total Tickets"
               value={data.totalTickets}
               sub="In selected period"
-              accent="🎫"
+              icon={Ticket}
             />
             <StatCard
               label="Open"
               value={data.openTickets}
               sub="Awaiting action"
-              accent="🟠"
+              icon={Circle}
             />
             <StatCard
               label="In Progress"
               value={data.inProgressTickets}
               sub="Being worked on"
-              accent="🔵"
+              icon={Clock}
             />
             <StatCard
               label="Resolved"
               value={data.resolvedTickets}
               sub="Completed"
-              accent="🟢"
+              icon={CheckCircle2}
             />
             <StatCard
               label="Closed"
               value={data.closedTickets}
               sub="Finalized"
-              accent="⚪"
+              icon={Lock}
             />
             <StatCard
               label="Escalated"
               value={data.escalatedTickets}
               sub="Needs reassignment"
-              accent="🔴"
+              icon={AlertTriangle}
             />
           </div>
 
-          <div style={{ marginBottom: "20px" }}>
+          <div className="mb-5">
             <TicketsOverTimeChart data={data.ticketsOverTime} />
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "20px",
-            }}
-          >
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <StatusPieChart data={data.statusBreakdown} />
             <PriorityBarChart data={data.priorityBreakdown} />
           </div>
 
-          <div style={{ marginTop: "20px" }}>
+          <div className="mt-5">
             <CategoryBarChart data={data.categoryBreakdown} />
           </div>
         </div>

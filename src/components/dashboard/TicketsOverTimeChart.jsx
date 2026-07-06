@@ -1,53 +1,63 @@
 import React from "react";
+import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Card } from "@/components/ui/card";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
+
+const chartConfig = {
+  created: {
+    label: "Created",
+    color: "hsl(217 91% 60%)",
+  },
+  resolved: {
+    label: "Resolved",
+    color: "hsl(142 71% 45%)",
+  },
+};
 
 export default function TicketsOverTimeChart({ data }) {
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "12px",
-        border: "1px solid #e5e7eb",
-        padding: "20px 24px",
-      }}
-    >
-      <h6
-        style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "16px" }}
-      >
-        Tickets Over Time
-      </h6>
-      <ResponsiveContainer width="100%" height={260}>
+    <Card className="p-5">
+      <h3 className="mb-4 text-sm font-semibold">Tickets Over Time</h3>
+      <ChartContainer config={chartConfig} className="h-[260px] w-full">
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-          <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-          <Tooltip />
-          <Legend />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            fontSize={12}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            allowDecimals={false}
+            fontSize={12}
+          />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <ChartLegend content={<ChartLegendContent />} />
           <Line
             type="monotone"
             dataKey="created"
-            name="Created"
-            stroke="#1d4ed8"
+            stroke="var(--color-created)"
             strokeWidth={2}
+            dot={false}
           />
           <Line
             type="monotone"
             dataKey="resolved"
-            name="Resolved"
-            stroke="#16a34a"
+            stroke="var(--color-resolved)"
             strokeWidth={2}
+            dot={false}
           />
         </LineChart>
-      </ResponsiveContainer>
-    </div>
+      </ChartContainer>
+    </Card>
   );
 }

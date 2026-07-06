@@ -6,47 +6,56 @@ import ITAgentPage from "./pages/ITAgentPage";
 import EmployeePage from "./pages/EmployeePage";
 import ManagerPage from "./pages/ManagerPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import ErrorBoundary from "./components/ErrorBoundary";
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LoginPage />} />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={["Admin"]}>
-              <AdminPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/itagent"
-          element={
-            <ProtectedRoute allowedRoles={["ITAgent", "IT"]}>
-              <ITAgentPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager"
-          element={
-            <ProtectedRoute allowedRoles={["Manager"]}>
-              <ManagerPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee"
-          element={
-            <ProtectedRoute allowedRoles={["Employee"]}>
-              <EmployeePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <TooltipProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LoginPage />} />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={["Admin"]}>
+                  <AdminPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/itagent"
+              element={
+                <ProtectedRoute allowedRoles={["ITAgent", "IT"]}>
+                  <ITAgentPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager"
+              element={
+                <ProtectedRoute allowedRoles={["Manager"]}>
+                  <ManagerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employee"
+              element={
+                <ProtectedRoute allowedRoles={["Employee"]}>
+                  <EmployeePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <Toaster />
+        </BrowserRouter>
+      </TooltipProvider>
+    </ErrorBoundary>
   );
 }
 
