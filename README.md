@@ -1,25 +1,44 @@
 # IT Help Desk
 
-A lightweight React-based IT Help Desk application using Tailwind CSS and shadcn UI components.
+A lightweight, role-based IT Help Desk single-page application built with React, Tailwind CSS, and shadcn UI primitives. The app provides ticket management workflows (create, assign, escalate, resolve), real-time notifications, and a dark-mode theme.
 
-## Features
+## Goals and Summary
 
-- Ticket creation, assignment, and status updates
-- Manager can update status and reassign in a single action
-- IT agent escalation locks ticket interactions
-- Role-based UI (Admin, Manager, IT Agent, Employee)
-- Dark mode toggle (shadcn + Tailwind, powered by `next-themes`)
-- Real-time notifications via SignalR
+- Provide a simple, fast interface for employees to create tickets and for IT teams and managers to triage and resolve them.
+- Support role-based capabilities: Admin, Manager, IT Agent, and Employee each see different UI and actions.
+- Real-time updates through SignalR so notifications and ticket changes propagate immediately.
 
-## Tech Stack
+## Key Features
 
-- React
-- Tailwind CSS
-- shadcn UI primitives
-- SignalR for notifications
-- `next-themes` for theme handling
+- Create and manage tickets with title, description, priority, category, and attachments.
+- Manager combined action: update ticket status and (re)assign an agent in a single operation.
+- IT escalation: when an IT Agent escalates a ticket, the ticket becomes read-only for that agent.
+- Role-aware UI: conditional rendering and permissions for Admin, Manager, IT Agent, and Employee.
+- Unified filter tabs across Admin, Manager, and Employee pages (status, priority, category, search).
+- Dark mode toggle implemented using `next-themes` and Tailwind `dark` class.
+- Real-time notifications via SignalR and a BroadcastChannel for cross-tab updates.
 
-## Quick Start
+## Architecture & Directory Overview
+
+Top-level structure (important files/folders):
+
+- `src/App.jsx` — app entry, routing, and global providers (ThemeProvider).
+- `src/index.css` — Tailwind imports and CSS variable overrides (light/dark palettes).
+- `src/components/` — shared UI components and higher-level widgets (Header, NotificationBell, TicketDetailModal, dialogs, forms).
+	- `src/components/ui/` — shadcn-style primitives (button, input, dialog, etc.).
+- `src/pages/` — page-level views: `AdminPage.jsx`, `ManagerPage.jsx`, `ITAgentPage.jsx`, `EmployeePage.jsx`, `ResetPasswordPage.jsx`.
+- `src/hooks/` — custom hooks (e.g., `useSpeechToText`, `useDashboardStats`).
+- `src/services/` — API and real-time services (e.g., `authService.js`, `notificationHub.js`).
+- `src/lib/` and `src/utils/` — utility and export helpers.
+
+## Roles & Permissions (high-level)
+
+- Admin: user management and high-level oversight. UI elements like the notification bell are hidden for Admin by default.
+- Manager: can change ticket status and assign/reassign agents in a single save action.
+- IT Agent: handles tickets, can escalate which locks interaction for that agent.
+- Employee: create tickets and view own tickets; filtering experience matches Manager/Admin pages.
+
+## Development
 
 1. Install dependencies
 
@@ -28,7 +47,7 @@ cd d:/react/ITHelpDesk
 npm install
 ```
 
-2. Run the app
+2. Run the development server
 
 ```bash
 npm start
@@ -40,21 +59,35 @@ npm start
 npm run build
 ```
 
-## Notable Files Changed
+4. Useful commands
 
-- `src/components/Header.jsx` — Notification bell hidden for Admin users
-- `src/components/NotificationBell.jsx` — improved dark-mode contrast for unread items
-- `src/components/TicketDetailModal.jsx` — Manager combined status + assignment update; escalation locks
-- `src/pages/EmployeePage.jsx`, `src/pages/AdminPage.jsx` — unified filter UI
-- `src/App.jsx`, `src/index.css` — theme provider and dark variables
+```bash
+npm run lint    # if configured
+npm test        # if tests exist
+```
 
-## Contribution
+## Notable Implementation Details
 
-- Please open issues or pull requests on the GitHub repo.
-- Follow the existing style conventions (Tailwind + shadcn patterns).
+- Theme: implemented with `next-themes` (`ThemeProvider attribute="class"`) and styled via Tailwind with `darkMode: ['class']` in `tailwind.config.js`.
+- UI kit: shadcn-style primitives are located under `src/components/ui` and used across pages for consistent styling.
+- Notifications: SignalR hub in `src/services/notificationHub.js` with unread handling in `src/components/NotificationBell.jsx` (contrast fixes for dark mode applied).
+- Manager flow: `src/components/TicketDetailModal.jsx` implements a single PATCH to update both `status` and `assignedTo` for manager saves.
 
-## Notes
+## Contributing
 
-- Theme is implemented via `next-themes` with `attribute="class"`.
-- If git push fails, ensure a remote is configured and you have permission to push.
+- Open an issue or PR on GitHub. Keep changes focused and follow existing patterns (Tailwind + shadcn).
+- Run linters and tests before submitting PRs.
 
+## Known Issues & TODOs
+
+- Persisting explicit theme preference beyond `next-themes` defaults may be desired for edge cases.
+- Some visual QA across all components in dark mode is recommended.
+- `NotificationBell` visibility and behavior can be further customized per-role via a config flag.
+
+## License
+
+This repository does not include a license file. Add a `LICENSE` if you wish to make the project open source.
+
+---
+
+If you want, I can also add a short `CONTRIBUTING.md`, CODE_OF_CONDUCT, or a sample `LICENSE` file and push them.
