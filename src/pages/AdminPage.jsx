@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+
 import { toast } from "sonner";
 import Header from "@/components/Header";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 import {
   LayoutDashboard,
@@ -9,13 +10,22 @@ import {
   Users,
   Plus,
   RotateCw,
-  LogOut,
   Activity,
+  Search,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -39,7 +49,6 @@ import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import ActivityLogModal from "@/components/ActivityLogModal";
 import CreateUserForm from "@/components/forms/CreateUserForm";
 
-import { logout, getUser } from "@/services/authService";
 import {
   useAllTickets,
   useAllUsers,
@@ -48,6 +57,16 @@ import {
   useDeleteUser,
   useChangeUserRole,
 } from "@/hooks/useAdminData";
+import TableSkeleton from "@/components/TableSkeleton";
+
+const STATUS_FILTERS = [
+  "All",
+  "Open",
+  "In Progress",
+  "Resolved",
+  "Closed",
+  "Escalated",
+];
 
 const ROLES = [
   { id: 1, name: "Admin" },
@@ -57,12 +76,16 @@ const ROLES = [
 ];
 
 export default function AdminPage() {
-  const navigate = useNavigate();
-  const currentUser = getUser();
-
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [search, setSearch] = useState("");
+  const [filterPrio, setFilterPrio] = useState("All Priorities");
+  const [filterCat, setFilterCat] = useState("All Categories");
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [activityModal, setActivityModal] = useState(null);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(null);
+  const [confirmActivate, setConfirmActivate] = useState(null);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState(null);
 
   const {
     data: tickets = [],
@@ -71,6 +94,26 @@ export default function AdminPage() {
     refetch: fetchTickets,
   } = useAllTickets();
   const ticketError = ticketIsError ? "Failed to load tickets." : "";
+
+  const categories = [
+    ...new Set(tickets.map((t) => t.categoryName).filter(Boolean)),
+  ];
+
+  const filteredTickets = tickets.filter((t) => {
+    const matchStatus =
+      filterStatus === "All" ||
+      (t.statusName || "").toLowerCase() === filterStatus.toLowerCase();
+    const matchSearch =
+      !search ||
+      (t.title || "").toLowerCase().includes(search.toLowerCase()) ||
+      `tkt-${String(t.id).padStart(4, "0")}`.includes(search.toLowerCase());
+    const matchPrio =
+      filterPrio === "All Priorities" ||
+      (t.priorityName || "").toLowerCase() === filterPrio.toLowerCase();
+    const matchCat =
+      filterCat === "All Categories" || (t.categoryName || "") === filterCat;
+    return matchStatus && matchSearch && matchPrio && matchCat;
+  });
 
   const {
     data: users = [],
@@ -85,43 +128,10 @@ export default function AdminPage() {
   const deleteUser = useDeleteUser();
   const changeUserRole = useChangeUserRole();
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
+  const handleDeactivate = (u) => setConfirmDeactivate(u);
 
-  const handleDeactivate = (u) => {
-    if (
-      !window.confirm(
-        `Deactivate ${u.userName}? They will not be able to log in.`,
-      )
-    )
-      return;
-    deactivateUser.mutate(u.id, {
-      onSuccess: () => toast.success(`${u.userName} has been deactivated.`),
-      onError: () => toast.error("Failed to deactivate user."),
-    });
-  };
-
-  const handleActivate = (u) => {
-    activateUser.mutate(u.id, {
-      onSuccess: () => toast.success(`${u.userName} has been activated.`),
-      onError: () => toast.error("Failed to activate user."),
-    });
-  };
-
-  const handleDelete = (u) => {
-    if (
-      !window.confirm(
-        `Permanently delete ${u.userName}? This cannot be undone.`,
-      )
-    )
-      return;
-    deleteUser.mutate(u.id, {
-      onSuccess: () => toast.success(`${u.userName} has been deleted.`),
-      onError: (err) => toast.error(err.message),
-    });
-  };
+  const handleActivate = (u) => setConfirmActivate(u);
+  const handleDelete = (u) => setConfirmDeleteUser(u);
 
   const handleRoleChange = (userId, roleId, userName) => {
     changeUserRole.mutate(
@@ -183,8 +193,8 @@ export default function AdminPage() {
                     All Tickets
                   </h1>
                   <p className="text-sm text-muted-foreground">
-                    {tickets.length} ticket{tickets.length !== 1 ? "s" : ""}{" "}
-                    total
+                    {filteredTickets.length} of {tickets.length} ticket
+                    {tickets.length !== 1 ? "s" : ""} total
                   </p>
                 </div>
                 <Button
@@ -197,9 +207,72 @@ export default function AdminPage() {
                 </Button>
               </div>
 
-              {ticketLoad && (
-                <p className="text-muted-foreground">Loading tickets...</p>
-              )}
+              <div className="mb-4 space-y-4">
+                <Tabs value={filterStatus} onValueChange={setFilterStatus}>
+                  <TabsList>
+                    {STATUS_FILTERS.map((s) => (
+                      <TabsTrigger key={s} value={s}>
+                        {s}
+                        {s !== "All" && (
+                          <span className="ml-1.5 rounded-full bg-muted-foreground/20 px-1.5 py-0.5 text-[10px]">
+                            {
+                              tickets.filter(
+                                (t) =>
+                                  (t.statusName || "").toLowerCase() ===
+                                  s.toLowerCase(),
+                              ).length
+                            }
+                          </span>
+                        )}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+
+                <div className="flex flex-wrap gap-2.5">
+                  <div className="relative min-w-[200px] flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search tickets..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="!pl-10"
+                    />
+                  </div>
+                  <Select value={filterPrio} onValueChange={setFilterPrio}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All Priorities">
+                        All Priorities
+                      </SelectItem>
+                      {["Low", "Medium", "High", "Critical"].map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterCat} onValueChange={setFilterCat}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All Categories">
+                        All Categories
+                      </SelectItem>
+                      {categories.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {ticketLoad && <TableSkeleton columns={9} rows={5} />}
               {ticketError && (
                 <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                   {ticketError}
@@ -223,17 +296,19 @@ export default function AdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tickets.length === 0 ? (
+                      {filteredTickets.length === 0 ? (
                         <TableRow>
                           <TableCell
                             colSpan={9}
                             className="py-12 text-center text-muted-foreground"
                           >
-                            No tickets found
+                            {tickets.length === 0
+                              ? "No tickets found"
+                              : "No tickets match your filters."}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        tickets.map((t) => (
+                        filteredTickets.map((t) => (
                           <TableRow key={t.id}>
                             <TableCell className="font-mono font-semibold">
                               TKT-{String(t.id).padStart(4, "0")}
@@ -303,9 +378,7 @@ export default function AdminPage() {
                 </Button>
               </div>
 
-              {userLoad && (
-                <p className="text-muted-foreground">Loading users...</p>
-              )}
+              {userLoad && <TableSkeleton columns={8} rows={5} />}
               {userError && (
                 <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                   {userError}
@@ -330,11 +403,14 @@ export default function AdminPage() {
                     <TableBody>
                       {users.length === 0 ? (
                         <TableRow>
-                          <TableCell
-                            colSpan={8}
-                            className="py-12 text-center text-muted-foreground"
-                          >
-                            No users found
+                          <TableCell colSpan={8} className="p-0">
+                            <EmptyState
+                              icon={Users}
+                              title="No users found"
+                              description="Create the first user to get started."
+                              actionLabel="+ Create User"
+                              onAction={() => setShowCreateUser(true)}
+                            />
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -461,6 +537,54 @@ export default function AdminPage() {
           onClose={() => setActivityModal(null)}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmDeactivate}
+        onOpenChange={(open) => !open && setConfirmDeactivate(null)}
+        title={`Deactivate ${confirmDeactivate?.userName}?`}
+        description="They will not be able to log in until reactivated."
+        confirmLabel="Deactivate"
+        variant="destructive"
+        onConfirm={() => {
+          deactivateUser.mutate(confirmDeactivate.id, {
+            onSuccess: () =>
+              toast.success(`${confirmDeactivate.userName} deactivated.`),
+            onError: () => toast.error("Failed to deactivate user."),
+          });
+          setConfirmDeactivate(null);
+        }}
+      />
+      <ConfirmDialog
+        open={!!confirmActivate}
+        onOpenChange={(open) => !open && setConfirmActivate(null)}
+        title={`Activate ${confirmActivate?.userName}?`}
+        description="They will be able to log in again."
+        confirmLabel="Activate"
+        onConfirm={() => {
+          activateUser.mutate(confirmActivate.id, {
+            onSuccess: () =>
+              toast.success(`${confirmActivate.userName} activated.`),
+            onError: () => toast.error("Failed to activate user."),
+          });
+          setConfirmActivate(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteUser}
+        onOpenChange={(open) => !open && setConfirmDeleteUser(null)}
+        title={`Delete ${confirmDeleteUser?.userName}?`}
+        description="This is permanent and cannot be undone. Users with attached data cannot be deleted — use Deactivate instead."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          deleteUser.mutate(confirmDeleteUser.id, {
+            onSuccess: () =>
+              toast.success(`${confirmDeleteUser.userName} deleted.`),
+            onError: (err) => toast.error(err.message),
+          });
+          setConfirmDeleteUser(null);
+        }}
+      />
     </div>
   );
 }

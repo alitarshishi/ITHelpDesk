@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+
 import Header from "@/components/Header";
 import { LayoutDashboard, Ticket, Search, Activity } from "lucide-react";
-import { authFetch, logout, getUser } from "@/services/authService";
+import { authFetch } from "@/services/authService";
+
+import EmptyState from "@/components/EmptyState";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import TableSkeleton from "@/components/TableSkeleton";
 import {
   Table,
   TableBody,
@@ -206,9 +209,7 @@ export default function ManagerPage() {
                 </div>
               </div>
 
-              {loading && (
-                <p className="p-6 text-muted-foreground">Loading tickets...</p>
-              )}
+              {loading && <TableSkeleton columns={9} rows={5} />}
               {error && (
                 <p className="m-6 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                   {error}
@@ -233,11 +234,16 @@ export default function ManagerPage() {
                   <TableBody>
                     {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell
-                          colSpan={9}
-                          className="py-12 text-center text-muted-foreground"
-                        >
-                          No tickets found
+                        <TableCell colSpan={9} className="p-0">
+                          <EmptyState
+                            icon={Ticket}
+                            title="No tickets found"
+                            description={
+                              filterStatus !== "All"
+                                ? `No ${filterStatus.toLowerCase()} tickets match your filters.`
+                                : "No tickets have been assigned to you yet."
+                            }
+                          />
                         </TableCell>
                       </TableRow>
                     ) : (

@@ -208,14 +208,16 @@ export default function NotificationBell({ onOpenTicket }) {
                 key={n.id}
                 onClick={() => handleNotificationClick(n)}
                 className={`flex cursor-pointer gap-2.5 border-b px-4 py-3 last:border-b-0 hover:bg-muted ${
-                  n.isRead ? "" : "bg-blue-50"
+                  n.isRead ? "" : "bg-blue-50 dark:bg-blue-950"
                 }`}
               >
                 {!n.isRead && (
                   <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-600" />
                 )}
                 <div>
-                  <div className="text-sm leading-snug">{n.message}</div>
+                  <div className="text-sm leading-snug text-foreground">
+                    {n.message}
+                  </div>
                   <div className="mt-0.5 text-xs text-muted-foreground">
                     {timeAgo(n.createdAt)}
                   </div>

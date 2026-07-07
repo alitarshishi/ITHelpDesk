@@ -12,7 +12,7 @@ import {
   Plus,
 } from "lucide-react";
 import { authFetch, getUser } from "@/services/authService";
-
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -98,7 +98,6 @@ export default function TicketDetailModal({
   const [attachError, setAttachError] = useState("");
   const fileInputRef = useRef(null);
   // manager actions
-  const [activeAction, setActiveAction] = useState(null); // "status" | "reassign"
   const [status, setStatus] = useState(ticket.statusName ?? "Open");
   const [assignId, setAssignId] = useState(
     ticket.assignedToId ? String(ticket.assignedToId) : "",
@@ -114,8 +113,10 @@ export default function TicketDetailModal({
   const [newNote, setNewNote] = useState("");
   const [submittingNote, setSubmittingNote] = useState(false);
   const [noteError, setNoteError] = useState("");
+  const [confirmEscalate, setConfirmEscalate] = useState(false);
 
   const currentStatusLower = (ticket.statusName || "").toLowerCase();
+  const isEscalated = currentStatusLower === "escalated";
   const managerCanChangeStatus =
     currentStatusLower === "open" ||
     currentStatusLower === "resolved" ||
@@ -123,7 +124,10 @@ export default function TicketDetailModal({
   const canShowResolveButton =
     canResolve &&
     currentStatusLower !== "resolved" &&
-    currentStatusLower !== "closed";
+    currentStatusLower !== "closed" &&
+    !isEscalated;
+  const canWriteComment = canComment && !isEscalated;
+  const canWriteNote = canAddNote && !isEscalated;
 
   useEffect(() => {
     fetchComments();
@@ -238,14 +242,7 @@ export default function TicketDetailModal({
     try {
       const body = { priorityId: null, statusId: null, assignedToId: null };
 
-      if (activeAction === "status") {
-        if (!managerCanChangeStatus) {
-          setManageError(
-            "You can only change status when the ticket is Open, Resolved, or Escalated.",
-          );
-          setSaving(false);
-          return;
-        }
+      if (managerCanChangeStatus) {
         const statRes = await authFetch(`${API_BASE_URL}/lookup/statuses`);
         const statuses = await statRes.json();
         const statusId = statuses.find(
@@ -259,9 +256,7 @@ export default function TicketDetailModal({
         body.statusId = statusId;
       }
 
-      if (activeAction === "reassign") {
-        body.assignedToId = assignId ? parseInt(assignId) : null;
-      }
+      body.assignedToId = assignId ? parseInt(assignId) : null;
 
       const res = await authFetch(
         `${API_BASE_URL}/manager/${ticket.id}/update`,
@@ -320,8 +315,11 @@ export default function TicketDetailModal({
     }
   };
 
-  const handleEscalate = async () => {
-    if (!window.confirm("Escalate this ticket to your manager?")) return;
+  const handleEscalate = () => setConfirmEscalate(true);
+
+  const doEscalate = async () => {
+    setConfirmEscalate(false);
+    setEscalating(true);
     setEscalating(true);
     setEscalateError("");
     try {
@@ -446,87 +444,65 @@ export default function TicketDetailModal({
                 </p>
               )}
 
-              {activeAction === "status" && (
-                <div className="rounded-md bg-muted p-4">
-                  <Label className="mb-2 block">Update Status</Label>
-                  {!managerCanChangeStatus ? (
-                    <p className="text-sm text-muted-foreground">
-                      Status can only be changed when the ticket is{" "}
-                      <strong>Open</strong>, <strong>Resolved</strong>, or{" "}
-                      <strong>Escalated</strong>. Current status is{" "}
-                      <strong>{ticket.statusName}</strong>.
-                    </p>
-                  ) : (
-                    <Select value={status} onValueChange={setStatus}>
+              <div className="rounded-md bg-muted p-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label className="mb-2 block">Update Status</Label>
+                    {!managerCanChangeStatus ? (
+                      <p className="text-sm text-muted-foreground">
+                        Status can only be changed when the ticket is{" "}
+                        <strong>Open</strong>, <strong>Resolved</strong>, or{" "}
+                        <strong>Escalated</strong>. Current status is{" "}
+                        <strong>{ticket.statusName}</strong>.
+                      </p>
+                    ) : (
+                      <Select value={status} onValueChange={setStatus}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MANAGER_ALLOWED_STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label className="mb-2 block">Assign to IT Agent</Label>
+                    <Select value={assignId} onValueChange={setAssignId}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="— Unassigned —" />
                       </SelectTrigger>
                       <SelectContent>
-                        {MANAGER_ALLOWED_STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
+                        {itAgents.map((a) => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            <div className="flex w-full items-center justify-between gap-3">
+                              <span>{a.userName}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {a.openTicketCount} active
+                              </span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  )}
+                  </div>
                 </div>
-              )}
+              </div>
 
-              {activeAction === "reassign" && (
-                <div className="rounded-md bg-muted p-4">
-                  <Label className="mb-2 block">Assign to IT Agent</Label>
-                  <Select value={assignId} onValueChange={setAssignId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="— Unassigned —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {itAgents.map((a) => (
-                        <SelectItem key={a.id} value={String(a.id)}>
-                          <div className="flex w-full items-center justify-between gap-3">
-                            <span>{a.userName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {a.openTicketCount} active
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2">
+              <div className="flex justify-end">
                 <Button
-                  variant={activeAction === "status" ? "default" : "outline"}
                   size="sm"
-                  onClick={() =>
-                    setActiveAction(activeAction === "status" ? null : "status")
-                  }
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleSave}
+                  disabled={saving}
                 >
-                  Update Status
+                  {saving ? "Saving..." : "Save Changes"}
                 </Button>
-                <Button
-                  variant={activeAction === "reassign" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    setActiveAction(
-                      activeAction === "reassign" ? null : "reassign",
-                    )
-                  }
-                >
-                  Reassign
-                </Button>
-                {activeAction && (
-                  <Button
-                    size="sm"
-                    className="ml-auto bg-green-600 hover:bg-green-700"
-                    onClick={handleSave}
-                    disabled={saving}
-                  >
-                    {saving ? "Saving..." : "Save Changes"}
-                  </Button>
-                )}
               </div>
             </div>
           </>
@@ -711,7 +687,14 @@ export default function TicketDetailModal({
             <p className="text-sm text-destructive">{commentError}</p>
           )}
 
-          {canComment && (
+          {isEscalated && canComment && (
+            <p className="rounded-md bg-muted/70 p-3 text-sm text-muted-foreground">
+              This ticket is escalated. IT agents can no longer update or
+              comment on it.
+            </p>
+          )}
+
+          {canWriteComment && (
             <div className="flex gap-2">
               <Textarea
                 rows={2}
@@ -728,6 +711,15 @@ export default function TicketDetailModal({
               </Button>
             </div>
           )}
+          <ConfirmDialog
+            open={confirmEscalate}
+            onOpenChange={setConfirmEscalate}
+            title="Escalate this ticket?"
+            description="The ticket will be marked as Escalated and your manager will be notified to reassign it."
+            confirmLabel="Escalate"
+            variant="destructive"
+            onConfirm={doEscalate}
+          />
         </div>
       </DialogContent>
     </Dialog>

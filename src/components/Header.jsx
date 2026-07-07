@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, SunMoon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { logout, getUser, getRole } from "@/services/authService";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ export default function Header({ actions, onOpenTicket }) {
   const currentUser = getUser();
   const role = getRole();
   const roleConfig = getRoleConfig(role);
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const activeTheme = resolvedTheme || theme;
 
   const handleLogout = async () => {
     await logout();
@@ -47,7 +50,17 @@ export default function Header({ actions, onOpenTicket }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <NotificationBell onOpenTicket={onOpenTicket} />
+        {role !== "Admin" && (
+          <NotificationBell onOpenTicket={onOpenTicket} />
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setTheme(activeTheme === "dark" ? "light" : "dark")}
+        >
+          <SunMoon className="mr-1 h-4 w-4" />
+          {activeTheme === "dark" ? "Light" : "Dark"}
+        </Button>
         {actions}
         <Button size="sm" variant="outline" onClick={handleLogout}>
           <LogOut className="mr-1 h-4 w-4" />

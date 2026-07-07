@@ -17,6 +17,8 @@ export default function VoiceTicketInput({ onParsed, managers = [] }) {
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState("");
 
+  const isEdge = navigator.userAgent.includes("Edg/");
+
   const speechSupported = !!(
     window.SpeechRecognition || window.webkitSpeechRecognition
   );
@@ -118,7 +120,15 @@ export default function VoiceTicketInput({ onParsed, managers = [] }) {
       {/* ── Speech API error ── */}
       {error && (
         <Alert variant="destructive" className="mb-3">
-          <AlertDescription className="text-sm">{error}</AlertDescription>
+          <AlertDescription className="text-sm">
+            {error}{" "}
+            {isEdge && error.includes("network") && (
+              <span className="mt-1.5 block text-xs">
+                <strong>Edge fix:</strong> Click the lock icon in the address
+                bar → Microphone → Allow, then refresh the page.
+              </span>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 

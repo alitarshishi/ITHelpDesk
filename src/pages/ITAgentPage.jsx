@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Activity } from "lucide-react";
-import { authFetch, logout } from "@/services/authService";
+import { authFetch } from "@/services/authService";
 import Header from "@/components/Header";
+import EmptyState from "@/components/EmptyState";
+import { Ticket, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import TableSkeleton from "@/components/TableSkeleton";
 import {
   Table,
   TableBody,
@@ -74,7 +76,7 @@ export default function ITAgentPage() {
           </p>
         </div>
 
-        {loading && <p className="text-muted-foreground">Loading tickets...</p>}
+        {loading && <TableSkeleton columns={9} rows={5} />}
         {error && (
           <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
             {error}
@@ -100,11 +102,14 @@ export default function ITAgentPage() {
               <TableBody>
                 {tickets.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={9}
-                      className="py-12 text-center text-muted-foreground"
-                    >
-                      No tickets assigned to you yet
+                    <TableCell colSpan={9} className="p-0">
+                      <EmptyState
+                        icon={Ticket}
+                        title="No tickets yet"
+                        description="Create your first ticket and it will appear here."
+                        actionLabel="+ Create Ticket"
+                        onAction={() => setShowModal(true)}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
