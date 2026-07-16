@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@/context/ThemeContext";
 import LoginPage from "./components/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import ITAgentPage from "./pages/ITAgentPage";
@@ -13,7 +13,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider>
       <ErrorBoundary>
         <TooltipProvider>
           <BrowserRouter>

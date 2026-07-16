@@ -16,6 +16,18 @@ function clearAuth() {
   localStorage.removeItem("user");
   localStorage.removeItem("role");
 }
+export function updateStoredUser(patch) {
+  const current = getUser() || {};
+  const updated = { ...current, ...patch };
+  try {
+    localStorage.setItem("user", JSON.stringify(updated));
+  } catch {
+    // ignore storage errors
+  }
+  // notify any mounted components (e.g. Header) to re-read localStorage
+  window.dispatchEvent(new CustomEvent("user-updated"));
+  return updated;
+}
 
 export async function login({ email, password }) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {

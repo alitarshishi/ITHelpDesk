@@ -2,6 +2,7 @@ import React from "react";
 import { Ticket, Users, Search } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import HelpChatWidget from "@/components/HelpChatWidget";
 
 import { toast } from "sonner";
 import { Plus, Activity, Trash2 } from "lucide-react";
@@ -372,6 +373,7 @@ export default function EmployeePage() {
         variant="destructive"
         onConfirm={confirmDeleteTicket}
       />
+      <HelpChatWidget />
     </div>
   );
 }
